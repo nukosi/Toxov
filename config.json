@@ -1,0 +1,10 @@
+{
+    "block_start": "08:00",
+    "block_end": "21:00",
+    "sites": [
+        "youtube.com",
+        "www.youtube.com",
+        "x.com",
+        "www.x.com"
+    ]
+}

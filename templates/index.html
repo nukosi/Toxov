@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>nukosisnsblocker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: -0.5px;
+    }
+
+    .status {
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .dot.active { background: #ff6b6b; box-shadow: 0 0 6px #ff6b6b; }
+    .dot.inactive { background: #69db7c; box-shadow: 0 0 6px #69db7c; }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .card h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #888;
+      margin-bottom: 14px;
+    }
+
+    .time-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .time-row label { font-size: 0.9rem; color: #aaa; }
+
+    input[type="time"], textarea {
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 0.95rem;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="time"]:focus, textarea:focus {
+      border-color: #4dabf7;
+    }
+
+    textarea {
+      width: 100%;
+      height: 130px;
+      resize: vertical;
+      font-family: monospace;
+      line-height: 1.6;
+    }
+
+    .hint { font-size: 0.78rem; color: #666; margin-top: 6px; }
+
+    .btn {
+      display: inline-block;
+      padding: 10px 22px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #4dabf7; color: #000; width: 100%; padding: 12px; font-size: 1rem; }
+    .btn-block   { background: #ff6b6b; color: #fff; }
+    .btn-unblock { background: #333; color: #e0e0e0; border: 1px solid #444; }
+
+    .manual-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .manual-row form { flex: 1; }
+    .manual-row .btn { width: 100%; }
+
+    .saved-banner {
+      background: #1e3a2a;
+      border: 1px solid #2d5a3d;
+      color: #69db7c;
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>nukosisnsblocker</h1>
+
+    <div class="status">
+      {% if blocking %}
+        <span class="dot active"></span>
+        ブロック中 &nbsp;({{ config.block_start }} ～ {{ config.block_end }})
+      {% else %}
+        <span class="dot inactive"></span>
+        解除中
+      {% endif %}
+    </div>
+
+    {% if saved %}
+    <div class="saved-banner">設定を保存しました</div>
+    {% endif %}
+
+    <form action="/save" method="post">
+      <!-- ブロック時間 -->
+      <div class="card">
+        <h2>ブロック時間</h2>
+        <div class="time-row">
+          <label>開始</label>
+          <input type="time" name="block_start" value="{{ config.block_start }}" required>
+          <label style="margin-left:8px;">終了</label>
+          <input type="time" name="block_end" value="{{ config.block_end }}" required>
+        </div>
+      </div>
+
+      <!-- サイト一覧 -->
+      <div class="card">
+        <h2>ブロックするサイト</h2>
+        <textarea name="sites">{{ config.sites | join('\n') }}</textarea>
+        <p class="hint">1行に1サイト。例: instagram.com</p>
+      </div>
+
+      <button type="submit" class="btn btn-primary">設定を保存</button>
+    </form>
+
+    <!-- 手動操作 -->
+    <div class="card" style="margin-top:16px;">
+      <h2>手動操作</h2>
+      <div class="manual-row">
+        <form action="/block" method="post">
+          <button type="submit" class="btn btn-block">今すぐブロック</button>
+        </form>
+        <form action="/unblock" method="post">
+          <button type="submit" class="btn btn-unblock">今すぐ解除</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
