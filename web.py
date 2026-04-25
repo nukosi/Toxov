@@ -9,6 +9,8 @@ from database import init_db, load_config, save_config, verify_password, create_
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "nukosisnsblocker-secret-key-change-this-later")
 
+init_db()
+
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
