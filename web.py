@@ -4,10 +4,10 @@ import os
 import subprocess
 import sys
 import datetime
-from database import init_db, load_config, save_config, verify_password
+from database import init_db, load_config, save_config, verify_password, create_user, get_user_by_id as _get_user
 
 app = Flask(__name__)
-app.secret_key = "nukosisnsblocker-secret-key-change-this-later"
+app.secret_key = os.environ.get("SECRET_KEY", "nukosisnsblocker-secret-key-change-this-later")
 
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
@@ -42,7 +42,7 @@ def login():
     if request.method == "POST":
         user = verify_password(request.form["username"], request.form["password"])
         if user:
-            login_user(User(user[0], user[1]))
+            login_user(User(user["id"], user["username"]))
             return redirect(url_for("index"))
         error = "ユーザー名またはパスワードが違います"
     return render_template("login.html", error=error)
@@ -87,6 +87,24 @@ def block():
 def unblock():
     subprocess.run([sys.executable, BLOCKER_FILE, "unblock"])
     return redirect(url_for("index"))
+
+
+@app.route("/setup", methods=["GET", "POST"])
+def setup():
+    from database import Session, engine, UserModel
+    with Session(engine) as session:
+        user_exists = session.query(UserModel).first() is not None
+    if user_exists:
+        return redirect(url_for("login"))
+    error = None
+    if request.method == "POST":
+        username = request.form["username"].strip()
+        password = request.form["password"].strip()
+        if username and password:
+            create_user(username, password)
+            return redirect(url_for("login"))
+        error = "ユーザー名とパスワードを入力してください"
+    return render_template("setup.html", error=error)
 
 
 @app.route("/api/config")
