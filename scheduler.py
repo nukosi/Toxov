@@ -1,5 +1,7 @@
 import time
 import datetime
+
+JST = datetime.timezone(datetime.timedelta(hours=9))
 import subprocess
 import sys
 import os
@@ -10,7 +12,7 @@ BLOCKER_FILE = os.path.join(BASE_DIR, "blocker.py")
 
 
 def should_be_blocked(config):
-    now = datetime.datetime.now().time()
+    now = datetime.datetime.now(JST).time()
     sh, sm = map(int, config["block_start"].split(":"))
     eh, em = map(int, config["block_end"].split(":"))
     return datetime.time(sh, sm) <= now < datetime.time(eh, em)

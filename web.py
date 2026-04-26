@@ -4,6 +4,8 @@ import os
 import subprocess
 import sys
 import datetime
+
+JST = datetime.timezone(datetime.timedelta(hours=9))
 from database import init_db, load_config, save_config, verify_password, create_user, get_user_by_id as _get_user
 
 app = Flask(__name__)
@@ -32,7 +34,7 @@ def load_user(user_id):
 
 
 def is_blocking_time(config):
-    now = datetime.datetime.now().time()
+    now = datetime.datetime.now(JST).time()
     sh, sm = map(int, config["block_start"].split(":"))
     eh, em = map(int, config["block_end"].split(":"))
     return datetime.time(sh, sm) <= now < datetime.time(eh, em)
