@@ -1,14 +1,23 @@
 import time
 import datetime
-
-JST = datetime.timezone(datetime.timedelta(hours=9))
 import subprocess
 import sys
 import os
-from database import init_db, load_config
+import requests
+
+# ここにRailwayのURLを設定する
+CLOUD_URL = "https://web-production-ed8c9.up.railway.app/api/config"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BLOCKER_FILE = os.path.join(BASE_DIR, "blocker.py")
+
+JST = datetime.timezone(datetime.timedelta(hours=9))
+
+
+def load_config():
+    response = requests.get(CLOUD_URL, timeout=10)
+    response.raise_for_status()
+    return response.json()
 
 
 def should_be_blocked(config):
@@ -24,8 +33,8 @@ def run_blocker(command):
 
 current_state = None
 
-init_db()
 print("nukosisnsblocker スケジューラー起動")
+print(f"設定取得先: {CLOUD_URL}")
 print("終了するには Ctrl+C")
 
 while True:
@@ -34,7 +43,7 @@ while True:
         should_block = should_be_blocked(config)
 
         if should_block != current_state:
-            now_str = datetime.datetime.now().strftime("%H:%M")
+            now_str = datetime.datetime.now(JST).strftime("%H:%M")
             if should_block:
                 print(f"[{now_str}] ブロック開始 ({config['block_start']} ～ {config['block_end']})")
                 run_blocker("block")
