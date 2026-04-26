@@ -172,17 +172,11 @@
       <button type="submit" class="btn btn-primary">設定を保存</button>
     </form>
 
-    <!-- 手動操作 -->
+    <!-- 手動操作はPC側のscheduler.pyが担当 -->
     <div class="card" style="margin-top:16px;">
       <h2>手動操作</h2>
-      <div class="manual-row">
-        <form action="/block" method="post">
-          <button type="submit" class="btn btn-block">今すぐブロック</button>
-        </form>
-        <form action="/unblock" method="post">
-          <button type="submit" class="btn btn-unblock">今すぐ解除</button>
-        </form>
-      </div>
+      <p style="font-size:0.85rem; color:#666;">ブロックの実行はPC上の scheduler.py が自動で行います。<br>PCのコマンドプロンプトで手動操作する場合:<br>
+      <code style="color:#aaa;">python blocker.py block</code> / <code style="color:#aaa;">unblock</code></p>
     </div>
   </div>
 </body>
