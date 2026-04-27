@@ -120,26 +120,40 @@ def main():
     cloud_url = local["cloud_url"]
     current_state = None
 
+    LOG_FILE = os.path.join(CONFIG_DIR, "agent.log")
+
+    def log(msg):
+        now = datetime.datetime.now(JST).strftime("%H:%M:%S")
+        line = f"[{now}] {msg}\n"
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line)
+
+    log(f"起動 URL={cloud_url}")
+
     while True:
         try:
             config = fetch_cloud_config(cloud_url)
             emergency = config.get("emergency_unblock", False)
+            log(f"poll OK emergency={emergency} current_state={current_state}")
 
             if emergency:
                 if current_state is not False:
                     unblock()
                     current_state = False
+                    log("緊急解除 実行")
             else:
                 should_block = should_be_blocked(config)
                 if should_block != current_state:
                     if should_block:
                         block(config.get("sites", []))
+                        log("ブロック 実行")
                     else:
                         unblock()
+                        log("解除 実行")
                     current_state = should_block
 
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"エラー: {e}")
 
         time.sleep(60)
 
