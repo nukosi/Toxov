@@ -1,7 +1,7 @@
 import os
 import json
 import secrets
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey
 from sqlalchemy.orm import declarative_base, Session, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -31,8 +31,9 @@ class Config(Base):
     id          = Column(Integer, primary_key=True, autoincrement=True)
     user_id     = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
     block_start = Column(String, nullable=False, default="08:00")
-    block_end   = Column(String, nullable=False, default="21:00")
-    user        = relationship("UserModel", back_populates="config")
+    block_end         = Column(String, nullable=False, default="21:00")
+    emergency_unblock = Column(Boolean, nullable=False, default=False)
+    user              = relationship("UserModel", back_populates="config")
 
 
 class Site(Base):
@@ -70,6 +71,12 @@ def _migrate():
                 first_user = conn.execute(text("SELECT id FROM users LIMIT 1")).fetchone()
                 if first_user:
                     conn.execute(text("UPDATE config SET user_id=:uid"), {"uid": first_user[0]})
+                conn.commit()
+        # config テーブルに emergency_unblock がなければ追加
+        if "config" in inspector.get_table_names():
+            config_columns = [c["name"] for c in inspector.get_columns("config")]
+            if "emergency_unblock" not in config_columns:
+                conn.execute(text("ALTER TABLE config ADD COLUMN emergency_unblock BOOLEAN DEFAULT FALSE"))
                 conn.commit()
         # sites テーブルに user_id がなければ追加
         if "sites" in inspector.get_table_names():
@@ -127,10 +134,19 @@ def load_config(user_id):
         if not config:
             return {"block_start": "08:00", "block_end": "21:00", "sites": []}
         return {
-            "block_start": config.block_start,
-            "block_end":   config.block_end,
-            "sites":       [s.domain for s in sites],
+            "block_start":      config.block_start,
+            "block_end":        config.block_end,
+            "sites":            [s.domain for s in sites],
+            "emergency_unblock": config.emergency_unblock or False,
         }
+
+
+def set_emergency_unblock(user_id, value: bool):
+    with Session(engine) as session:
+        config = session.query(Config).filter_by(user_id=user_id).first()
+        if config:
+            config.emergency_unblock = value
+            session.commit()
 
 
 def save_config(user_id, block_start, block_end, sites):

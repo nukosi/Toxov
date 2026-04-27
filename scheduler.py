@@ -6,7 +6,7 @@ import os
 import requests
 
 # ここにRailwayのURLを設定する
-CLOUD_URL = "https://web-production-ed8c9.up.railway.app/api/config"
+CLOUD_URL = "https://web-production-ed8c9.up.railway.app/api/config/pQydCprqIytFYZzLsi_lnAl_ht083VFq1BSj-z4oD_U"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BLOCKER_FILE = os.path.join(BASE_DIR, "blocker.py")

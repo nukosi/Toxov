@@ -137,7 +137,10 @@
     <h1>nukosisnsblocker</h1>
 
     <div class="status">
-      {% if blocking %}
+      {% if config.emergency_unblock %}
+        <span class="dot" style="background:#ffa94d; box-shadow:0 0 6px #ffa94d;"></span>
+        緊急解除中
+      {% elif blocking %}
         <span class="dot active"></span>
         ブロック中 &nbsp;({{ config.block_start }} ～ {{ config.block_end }})
       {% else %}
@@ -171,6 +174,22 @@
 
       <button type="submit" class="btn btn-primary">設定を保存</button>
     </form>
+
+    <!-- 緊急解除 -->
+    <div class="card" style="margin-top:16px;">
+      <h2>緊急解除</h2>
+      {% if config.emergency_unblock %}
+        <p style="font-size:0.85rem; color:#ffa94d; margin-bottom:10px;">現在緊急解除中です。ブロックを再開するには下のボタンを押してください。</p>
+        <form action="/resume" method="post">
+          <button type="submit" class="btn btn-primary" style="background:#69db7c; color:#000;">ブロックを再開する</button>
+        </form>
+      {% else %}
+        <p style="font-size:0.82rem; color:#666; margin-bottom:10px;">ブロック時間中に一時的に解除します</p>
+        <form action="/emergency" method="post">
+          <button type="submit" class="btn" style="background:#ff6b6b; color:#fff; width:100%; padding:12px; font-size:1rem; font-weight:600; border:none; border-radius:8px; cursor:pointer;">緊急解除</button>
+        </form>
+      {% endif %}
+    </div>
 
     <!-- APIトークン -->
     <div class="card" style="margin-top:16px;">

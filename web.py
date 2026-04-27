@@ -3,7 +3,8 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 import os
 import datetime
 from database import (init_db, load_config, save_config,
-                      verify_password, create_user, get_user_by_id, get_user_by_token)
+                      verify_password, create_user, get_user_by_id, get_user_by_token,
+                      set_emergency_unblock)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "nukosisnsblocker-secret-key-change-this-later")
@@ -95,6 +96,20 @@ def save():
     sites       = [s.strip() for s in sites_raw.splitlines() if s.strip()]
     save_config(current_user.id, block_start, block_end, sites)
     return redirect(url_for("index", saved=1))
+
+
+@app.route("/emergency", methods=["POST"])
+@login_required
+def emergency():
+    set_emergency_unblock(current_user.id, True)
+    return redirect(url_for("index"))
+
+
+@app.route("/resume", methods=["POST"])
+@login_required
+def resume():
+    set_emergency_unblock(current_user.id, False)
+    return redirect(url_for("index"))
 
 
 @app.route("/api/config/<token>")
