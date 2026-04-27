@@ -4,7 +4,7 @@ import json
 import os
 
 HOSTS_FILE = r"C:\Windows\System32\drivers\etc\hosts"
-BLOCK_TAG = "# freedom-blocker"
+BLOCK_TAG = "# nukosisnsblocker"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 
 
