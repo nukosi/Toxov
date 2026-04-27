@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ログイン - nukosisnsblocker</title>
+  <title>新規登録 - nukosisnsblocker</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -47,8 +47,11 @@
       font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
+      margin-bottom: 12px;
     }
     button:hover { opacity: 0.85; }
+    a { display: block; text-align: center; color: #888; font-size: 0.85rem; text-decoration: none; }
+    a:hover { color: #e0e0e0; }
     .error {
       background: #3a1a1a;
       border: 1px solid #5a2a2a;
@@ -62,7 +65,7 @@
 </head>
 <body>
   <div class="card">
-    <h1>nukosisnsblocker</h1>
+    <h1>新規登録</h1>
     {% if error %}
     <div class="error">{{ error }}</div>
     {% endif %}
@@ -71,9 +74,9 @@
       <input type="text" name="username" autofocus required>
       <label>パスワード</label>
       <input type="password" name="password" required>
-      <button type="submit">ログイン</button>
+      <button type="submit">アカウントを作成</button>
     </form>
-    <a href="/register" style="display:block; text-align:center; color:#888; font-size:0.85rem; text-decoration:none; margin-top:16px;">新規登録はこちら</a>
+    <a href="/login">すでにアカウントをお持ちの方</a>
   </div>
 </body>
 </html>

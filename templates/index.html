@@ -172,11 +172,13 @@
       <button type="submit" class="btn btn-primary">設定を保存</button>
     </form>
 
-    <!-- 手動操作はPC側のscheduler.pyが担当 -->
+    <!-- APIトークン -->
     <div class="card" style="margin-top:16px;">
-      <h2>手動操作</h2>
-      <p style="font-size:0.85rem; color:#666;">ブロックの実行はPC上の scheduler.py が自動で行います。<br>PCのコマンドプロンプトで手動操作する場合:<br>
-      <code style="color:#aaa;">python blocker.py block</code> / <code style="color:#aaa;">unblock</code></p>
+      <h2>PC連携トークン</h2>
+      <p style="font-size:0.82rem; color:#666; margin-bottom:8px;">scheduler.py の CLOUD_URL に設定してください</p>
+      <code style="display:block; background:#252525; padding:10px; border-radius:6px; font-size:0.8rem; word-break:break-all; color:#aaa;">
+        https://{{ request.host }}/api/config/{{ api_token }}
+      </code>
     </div>
   </div>
 </body>

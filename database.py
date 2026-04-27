@@ -1,7 +1,8 @@
 import os
 import json
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import declarative_base, Session
+import secrets
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy.orm import declarative_base, Session, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,84 +16,64 @@ engine = create_engine(_url)
 Base = declarative_base()
 
 
+class UserModel(Base):
+    __tablename__ = "users"
+    id        = Column(Integer, primary_key=True, autoincrement=True)
+    username  = Column(String, nullable=False, unique=True)
+    password  = Column(String, nullable=False)
+    api_token = Column(String, nullable=False, unique=True)
+    config    = relationship("Config", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    sites     = relationship("Site", back_populates="user", cascade="all, delete-orphan")
+
+
 class Config(Base):
     __tablename__ = "config"
-    id          = Column(Integer, primary_key=True)
+    id          = Column(Integer, primary_key=True, autoincrement=True)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
     block_start = Column(String, nullable=False, default="08:00")
     block_end   = Column(String, nullable=False, default="21:00")
+    user        = relationship("UserModel", back_populates="config")
 
 
 class Site(Base):
     __tablename__ = "sites"
-    id     = Column(Integer, primary_key=True, autoincrement=True)
-    domain = Column(String, nullable=False, unique=True)
-
-
-class UserModel(Base):
-    __tablename__ = "users"
-    id       = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, nullable=False, unique=True)
-    password = Column(String, nullable=False)
+    id      = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    domain  = Column(String, nullable=False)
+    user    = relationship("UserModel", back_populates="sites")
 
 
 def init_db():
     Base.metadata.create_all(engine)
-    with Session(engine) as session:
-        if not session.get(Config, 1):
-            _migrate_from_json(session)
-            session.commit()
-
-
-def _migrate_from_json(session):
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        session.add(Config(id=1,
-                           block_start=data.get("block_start", "08:00"),
-                           block_end=data.get("block_end", "21:00")))
-        for domain in data.get("sites", []):
-            session.add(Site(domain=domain))
-        print("config.json からデータを移行しました")
-    else:
-        session.add(Config(id=1, block_start="08:00", block_end="21:00"))
-
-
-def load_config():
-    with Session(engine) as session:
-        config = session.get(Config, 1)
-        sites  = session.query(Site).order_by(Site.id).all()
-        return {
-            "block_start": config.block_start,
-            "block_end":   config.block_end,
-            "sites":       [s.domain for s in sites],
-        }
-
-
-def save_config(block_start, block_end, sites):
-    with Session(engine) as session:
-        config = session.get(Config, 1)
-        config.block_start = block_start
-        config.block_end   = block_end
-        session.query(Site).delete()
-        for domain in sites:
-            session.add(Site(domain=domain))
-        session.commit()
 
 
 def create_user(username, password):
+    token = secrets.token_urlsafe(32)
     with Session(engine) as session:
         user = session.query(UserModel).filter_by(username=username).first()
         if user:
             user.password = generate_password_hash(password)
         else:
-            session.add(UserModel(username=username,
-                                  password=generate_password_hash(password)))
+            user = UserModel(
+                username=username,
+                password=generate_password_hash(password),
+                api_token=token,
+            )
+            session.add(user)
+            session.flush()
+            session.add(Config(user_id=user.id, block_start="08:00", block_end="21:00"))
         session.commit()
 
 
 def get_user_by_id(user_id):
     with Session(engine) as session:
         user = session.get(UserModel, user_id)
+        return {"id": user.id, "username": user.username, "api_token": user.api_token} if user else None
+
+
+def get_user_by_token(token):
+    with Session(engine) as session:
+        user = session.query(UserModel).filter_by(api_token=token).first()
         return {"id": user.id, "username": user.username} if user else None
 
 
@@ -102,3 +83,31 @@ def verify_password(username, password):
         if user and check_password_hash(user.password, password):
             return {"id": user.id, "username": user.username}
     return None
+
+
+def load_config(user_id):
+    with Session(engine) as session:
+        config = session.query(Config).filter_by(user_id=user_id).first()
+        sites  = session.query(Site).filter_by(user_id=user_id).all()
+        if not config:
+            return {"block_start": "08:00", "block_end": "21:00", "sites": []}
+        return {
+            "block_start": config.block_start,
+            "block_end":   config.block_end,
+            "sites":       [s.domain for s in sites],
+        }
+
+
+def save_config(user_id, block_start, block_end, sites):
+    with Session(engine) as session:
+        config = session.query(Config).filter_by(user_id=user_id).first()
+        if not config:
+            config = Config(user_id=user_id, block_start=block_start, block_end=block_end)
+            session.add(config)
+        else:
+            config.block_start = block_start
+            config.block_end   = block_end
+        session.query(Site).filter_by(user_id=user_id).delete()
+        for domain in sites:
+            session.add(Site(user_id=user_id, domain=domain))
+        session.commit()
