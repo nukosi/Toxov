@@ -45,6 +45,41 @@ class Site(Base):
 
 def init_db():
     Base.metadata.create_all(engine)
+    _migrate()
+
+
+def _migrate():
+    from sqlalchemy import text, inspect
+    with engine.connect() as conn:
+        inspector = inspect(engine)
+        # users テーブルに api_token がなければ追加
+        user_columns = [c["name"] for c in inspector.get_columns("users")]
+        if "api_token" not in user_columns:
+            conn.execute(text("ALTER TABLE users ADD COLUMN api_token TEXT"))
+            users = conn.execute(text("SELECT id FROM users")).fetchall()
+            for (uid,) in users:
+                token = secrets.token_urlsafe(32)
+                conn.execute(text("UPDATE users SET api_token=:t WHERE id=:id"),
+                             {"t": token, "id": uid})
+            conn.commit()
+        # config テーブルに user_id がなければ追加
+        if "config" in inspector.get_table_names():
+            config_columns = [c["name"] for c in inspector.get_columns("config")]
+            if "user_id" not in config_columns:
+                conn.execute(text("ALTER TABLE config ADD COLUMN user_id INTEGER"))
+                first_user = conn.execute(text("SELECT id FROM users LIMIT 1")).fetchone()
+                if first_user:
+                    conn.execute(text("UPDATE config SET user_id=:uid"), {"uid": first_user[0]})
+                conn.commit()
+        # sites テーブルに user_id がなければ追加
+        if "sites" in inspector.get_table_names():
+            site_columns = [c["name"] for c in inspector.get_columns("sites")]
+            if "user_id" not in site_columns:
+                conn.execute(text("ALTER TABLE sites ADD COLUMN user_id INTEGER"))
+                first_user = conn.execute(text("SELECT id FROM users LIMIT 1")).fetchone()
+                if first_user:
+                    conn.execute(text("UPDATE sites SET user_id=:uid"), {"uid": first_user[0]})
+                conn.commit()
 
 
 def create_user(username, password):
