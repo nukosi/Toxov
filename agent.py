@@ -143,14 +143,15 @@ def main():
                     log("緊急解除 実行")
             else:
                 should_block = should_be_blocked(config)
-                if should_block != current_state:
-                    if should_block:
-                        block(config.get("sites", []))
+                if should_block:
+                    block(config.get("sites", []))
+                    if current_state is not True:
                         log("ブロック 実行")
-                    else:
-                        unblock()
-                        log("解除 実行")
-                    current_state = should_block
+                    current_state = True
+                elif current_state is not False:
+                    unblock()
+                    log("解除 実行")
+                    current_state = False
 
         except Exception as e:
             log(f"エラー: {e}")
