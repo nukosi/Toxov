@@ -9,10 +9,10 @@ import requests
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 
-CONFIG_DIR  = os.path.join(os.environ["APPDATA"], "nukosisnsblocker")
+CONFIG_DIR  = os.path.join(os.environ["APPDATA"], "CutNet")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 HOSTS_FILE  = r"C:\Windows\System32\drivers\etc\hosts"
-BLOCK_TAG   = "# nukosisnsblocker"
+BLOCK_TAG   = "# CutNet"
 JST         = datetime.timezone(datetime.timedelta(hours=9))
 
 
@@ -35,7 +35,7 @@ def first_run_setup():
     root.withdraw()
 
     url = simpledialog.askstring(
-        "nukosisnsblocker セットアップ",
+        "CutNet セットアップ",
         "Webサイトの「PC連携トークン」URLを貼り付けてください:",
         parent=root,
     )
@@ -51,7 +51,7 @@ def first_run_setup():
     register_autostart()
 
     messagebox.showinfo(
-        "セットアップ完了",
+        "CutNet セットアップ完了",
         "設定が完了しました！\nPC起動時に自動でブロックが動作します。",
     )
     root.destroy()
@@ -64,7 +64,7 @@ $action   = New-ScheduledTaskAction -Execute '{exe}'
 $trigger  = New-ScheduledTaskTrigger -AtLogOn
 $principal= New-ScheduledTaskPrincipal -UserId '{os.environ["USERNAME"]}' -RunLevel Highest -LogonType Interactive
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0
-Register-ScheduledTask -TaskName 'nukosisnsblocker' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force
+Register-ScheduledTask -TaskName 'CutNet' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force
 """
     subprocess.run(["powershell", "-Command", ps], capture_output=True)
 

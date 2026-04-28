@@ -5,7 +5,7 @@ with open(HOSTS_FILE, "r") as f:
 
 with open(HOSTS_FILE, "w") as f:
     for line in lines:
-        if "# freedom-blocker" not in line and "# nukosisnsblocker" not in line:
+        if "# freedom-blocker" not in line and "# nukosisnsblocker" not in line and "# CutNet" not in line:
             f.write(line)
 
 print("hostsファイルをクリーンアップしました")

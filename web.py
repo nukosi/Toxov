@@ -139,6 +139,6 @@ def setup():
 
 
 if __name__ == "__main__":
-    print("nukosisnsblocker Web UI 起動中...")
+    print("CutNet Web UI 起動中...")
     print("ブラウザで http://localhost:5000 を開いてください")
     app.run(host="0.0.0.0", port=5000, debug=False)
