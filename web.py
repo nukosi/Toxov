@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 import os
 import datetime
@@ -118,6 +118,11 @@ def api_config(token):
     if not user:
         return jsonify({"error": "invalid token"}), 401
     return jsonify(load_config(user["id"]))
+
+
+@app.route("/download")
+def download():
+    return send_from_directory("dist", "CutNet.exe", as_attachment=True)
 
 
 @app.route("/setup", methods=["GET", "POST"])
