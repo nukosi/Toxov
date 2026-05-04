@@ -122,7 +122,7 @@ def api_config(token):
 
 @app.route("/download")
 def download():
-    return redirect("https://github.com/nukosi/nukosisnsblocker/releases/latest/download/CutNet.exe")
+    return send_from_directory("dist", "CutNet.exe", as_attachment=True)
 
 
 @app.route("/setup", methods=["GET", "POST"])
