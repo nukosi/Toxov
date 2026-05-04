@@ -14,6 +14,7 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 HOSTS_FILE  = r"C:\Windows\System32\drivers\etc\hosts"
 BLOCK_TAG   = "# CutNet"
 JST         = datetime.timezone(datetime.timedelta(hours=9))
+POLL_INTERVAL = 30  # seconds
 
 
 def is_admin():
@@ -74,13 +75,8 @@ def load_local_config():
         return json.load(f)
 
 
-def fetch_cloud_config(url):
-    response = requests.get(url, timeout=10)
-    response.raise_for_status()
-    return response.json()
-
-
 def should_be_blocked(config):
+    """ローカル時刻で判定。サーバー不要。"""
     now = datetime.datetime.now(JST).time()
     sh, sm = map(int, config["block_start"].split(":"))
     eh, em = map(int, config["block_end"].split(":"))
@@ -108,6 +104,53 @@ def unblock():
     subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
 
 
+def config_stream(url, log):
+    """
+    設定取得インターフェース。
+    将来このジェネレータをWebSocket版に丸ごと置き換える。
+    """
+    while True:
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            yield response.json()
+        except Exception as e:
+            log(f"エラー: {e}")
+        time.sleep(POLL_INTERVAL)
+
+
+def apply_config(config, current_state, last_version, log):
+    """
+    ローカル判定のみ。サーバーの時刻・状態に依存しない。
+    戻り値: (new_state, new_last_version)
+    """
+    version        = config.get("version")
+    emergency      = config.get("emergency_unblock", False)
+    config_changed = version != last_version
+
+    log(f"poll v={version} emergency={emergency} state={current_state}")
+
+    if emergency:
+        if current_state is not False:
+            unblock()
+            log("緊急解除 実行")
+        return False, version
+
+    should_block = should_be_blocked(config)
+
+    if should_block:
+        if config_changed or current_state is not True:
+            block(config.get("sites", []))
+        if current_state is not True:
+            log("ブロック 実行")
+        return True, version
+    else:
+        if current_state is not False:
+            unblock()
+            log("解除 実行")
+        return False, version
+
+
 def main():
     if not is_admin():
         relaunch_as_admin()
@@ -116,47 +159,25 @@ def main():
     if not os.path.exists(CONFIG_FILE):
         first_run_setup()
 
-    local  = load_local_config()
+    local     = load_local_config()
     cloud_url = local["cloud_url"]
-    current_state = None
 
     LOG_FILE = os.path.join(CONFIG_DIR, "agent.log")
 
     def log(msg):
         now = datetime.datetime.now(JST).strftime("%H:%M:%S")
-        line = f"[{now}] {msg}\n"
         with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(line)
+            f.write(f"[{now}] {msg}\n")
 
     log(f"起動 URL={cloud_url}")
 
-    while True:
-        try:
-            config = fetch_cloud_config(cloud_url)
-            emergency = config.get("emergency_unblock", False)
-            log(f"poll OK emergency={emergency} current_state={current_state}")
+    current_state = None
+    last_version  = None
 
-            if emergency:
-                if current_state is not False:
-                    unblock()
-                    current_state = False
-                    log("緊急解除 実行")
-            else:
-                should_block = should_be_blocked(config)
-                if should_block:
-                    block(config.get("sites", []))
-                    if current_state is not True:
-                        log("ブロック 実行")
-                    current_state = True
-                elif current_state is not False:
-                    unblock()
-                    log("解除 実行")
-                    current_state = False
-
-        except Exception as e:
-            log(f"エラー: {e}")
-
-        time.sleep(60)
+    for config in config_stream(cloud_url, log):
+        current_state, last_version = apply_config(
+            config, current_state, last_version, log
+        )
 
 
 if __name__ == "__main__":

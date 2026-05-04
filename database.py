@@ -28,11 +28,12 @@ class UserModel(Base):
 
 class Config(Base):
     __tablename__ = "config"
-    id          = Column(Integer, primary_key=True, autoincrement=True)
-    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-    block_start = Column(String, nullable=False, default="08:00")
+    id                = Column(Integer, primary_key=True, autoincrement=True)
+    user_id           = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    block_start       = Column(String, nullable=False, default="08:00")
     block_end         = Column(String, nullable=False, default="21:00")
     emergency_unblock = Column(Boolean, nullable=False, default=False)
+    version           = Column(Integer, nullable=False, default=0)
     user              = relationship("UserModel", back_populates="config")
 
 
@@ -77,6 +78,12 @@ def _migrate():
             config_columns = [c["name"] for c in inspector.get_columns("config")]
             if "emergency_unblock" not in config_columns:
                 conn.execute(text("ALTER TABLE config ADD COLUMN emergency_unblock BOOLEAN DEFAULT FALSE"))
+                conn.commit()
+        # config テーブルに version がなければ追加
+        if "config" in inspector.get_table_names():
+            config_columns = [c["name"] for c in inspector.get_columns("config")]
+            if "version" not in config_columns:
+                conn.execute(text("ALTER TABLE config ADD COLUMN version INTEGER DEFAULT 0"))
                 conn.commit()
         # sites テーブルに user_id がなければ追加
         if "sites" in inspector.get_table_names():
@@ -134,6 +141,7 @@ def load_config(user_id):
         if not config:
             return {"block_start": "08:00", "block_end": "21:00", "sites": []}
         return {
+            "version":          config.version or 0,
             "block_start":      config.block_start,
             "block_end":        config.block_end,
             "sites":            [s.domain for s in sites],
@@ -146,6 +154,7 @@ def set_emergency_unblock(user_id, value: bool):
         config = session.query(Config).filter_by(user_id=user_id).first()
         if config:
             config.emergency_unblock = value
+            config.version = (config.version or 0) + 1
             session.commit()
 
 
@@ -158,6 +167,7 @@ def save_config(user_id, block_start, block_end, sites):
         else:
             config.block_start = block_start
             config.block_end   = block_end
+        config.version = (config.version or 0) + 1
         session.query(Site).filter_by(user_id=user_id).delete()
         for domain in sites:
             session.add(Site(user_id=user_id, domain=domain))
