@@ -191,6 +191,30 @@
       {% endif %}
     </div>
 
+    <!-- ログ -->
+    <div class="card" style="margin-top:16px;">
+      <h2>ログ</h2>
+      {% if logs %}
+        <table style="width:100%; font-size:0.82rem; border-collapse:collapse;">
+          {% for l in logs %}
+          <tr style="border-bottom:1px solid #2a2a2a;">
+            <td style="padding:6px 0; color:#666; width:110px;">{{ l.created_at }}</td>
+            <td style="padding:6px 0; color:
+              {% if l.event == 'block_start' %}#ff6b6b
+              {% elif l.event == 'block_end' %}#69db7c
+              {% else %}#ffa94d{% endif %};">
+              {% if l.event == 'block_start' %}ブロック開始
+              {% elif l.event == 'block_end' %}ブロック終了
+              {% else %}緊急解除{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% else %}
+        <p style="font-size:0.82rem; color:#666;">まだログがありません</p>
+      {% endif %}
+    </div>
+
     <!-- APIトークン -->
     <div class="card" style="margin-top:16px;">
       <h2>PC連携トークン</h2>

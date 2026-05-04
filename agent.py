@@ -122,11 +122,12 @@ def config_stream(url, log):
 def apply_config(config, current_state, last_version, log):
     """
     ローカル判定のみ。サーバーの時刻・状態に依存しない。
-    戻り値: (new_state, new_last_version)
+    戻り値: (new_state, new_last_version, events)
     """
     version        = config.get("version")
     emergency      = config.get("emergency_unblock", False)
     config_changed = version != last_version
+    events         = []
 
     log(f"poll v={version} emergency={emergency} state={current_state}")
 
@@ -134,7 +135,8 @@ def apply_config(config, current_state, last_version, log):
         if current_state is not False:
             unblock()
             log("緊急解除 実行")
-        return False, version
+            events.append("emergency_unblock")
+        return False, version, events
 
     should_block = should_be_blocked(config)
 
@@ -143,12 +145,14 @@ def apply_config(config, current_state, last_version, log):
             block(config.get("sites", []))
         if current_state is not True:
             log("ブロック 実行")
-        return True, version
+            events.append("block_start")
+        return True, version, events
     else:
         if current_state is not False:
             unblock()
             log("解除 実行")
-        return False, version
+            events.append("block_end")
+        return False, version, events
 
 
 def main():
@@ -171,13 +175,19 @@ def main():
 
     log(f"起動 URL={cloud_url}")
 
+    log_url       = cloud_url.replace("/api/config/", "/api/log/")
     current_state = None
     last_version  = None
 
     for config in config_stream(cloud_url, log):
-        current_state, last_version = apply_config(
+        current_state, last_version, events = apply_config(
             config, current_state, last_version, log
         )
+        for event in events:
+            try:
+                requests.post(log_url, json={"event": event}, timeout=5)
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

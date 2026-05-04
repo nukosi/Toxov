@@ -4,7 +4,7 @@ import os
 import datetime
 from database import (init_db, load_config, save_config,
                       verify_password, create_user, get_user_by_id, get_user_by_token,
-                      set_emergency_unblock)
+                      set_emergency_unblock, add_event_log, get_event_logs)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "nukosisnsblocker-secret-key-change-this-later")
@@ -83,8 +83,9 @@ def index():
     config  = load_config(current_user.id)
     blocking = is_blocking_time(config)
     saved   = request.args.get("saved", False)
+    logs = get_event_logs(current_user.id)
     return render_template("index.html", config=config, blocking=blocking,
-                           saved=saved, api_token=current_user.api_token)
+                           saved=saved, api_token=current_user.api_token, logs=logs)
 
 
 @app.route("/save", methods=["POST"])
@@ -118,6 +119,17 @@ def api_config(token):
     if not user:
         return jsonify({"error": "invalid token"}), 401
     return jsonify(load_config(user["id"]))
+
+
+@app.route("/api/log/<token>", methods=["POST"])
+def api_log(token):
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    event = request.json.get("event")
+    if event in ("block_start", "block_end", "emergency_unblock"):
+        add_event_log(user["id"], event)
+    return jsonify({"ok": True})
 
 
 @app.route("/download")

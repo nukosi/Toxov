@@ -1,7 +1,8 @@
 import os
 import json
 import secrets
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, DateTime
+import datetime
 from sqlalchemy.orm import declarative_base, Session, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -43,6 +44,14 @@ class Site(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     domain  = Column(String, nullable=False)
     user    = relationship("UserModel", back_populates="sites")
+
+
+class EventLog(Base):
+    __tablename__ = "event_logs"
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    event      = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False)
 
 
 def init_db():
@@ -156,6 +165,29 @@ def set_emergency_unblock(user_id, value: bool):
             config.emergency_unblock = value
             config.version = (config.version or 0) + 1
             session.commit()
+
+
+def add_event_log(user_id, event):
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    with Session(engine) as session:
+        session.add(EventLog(
+            user_id    = user_id,
+            event      = event,
+            created_at = datetime.datetime.now(JST).replace(tzinfo=None),
+        ))
+        session.commit()
+
+
+def get_event_logs(user_id, limit=30):
+    with Session(engine) as session:
+        logs = (
+            session.query(EventLog)
+            .filter_by(user_id=user_id)
+            .order_by(EventLog.id.desc())
+            .limit(limit)
+            .all()
+        )
+        return [{"event": l.event, "created_at": l.created_at.strftime("%m/%d %H:%M:%S")} for l in logs]
 
 
 def save_config(user_id, block_start, block_end, sites):
