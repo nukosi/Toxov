@@ -4,7 +4,7 @@ import os
 import datetime
 from database import (init_db, load_config, save_config,
                       verify_password, create_user, get_user_by_id, get_user_by_token,
-                      set_emergency_unblock, add_event_log, get_event_logs)
+                      set_emergency_unblock, add_event_log, get_event_logs, get_streak)
 
 app = Flask(__name__)
 # 本番環境では環境変数 SECRET_KEY に強いランダム文字列を設定すること
@@ -86,9 +86,11 @@ def index():
     config  = load_config(current_user.id)
     blocking = is_blocking_time(config)
     saved   = request.args.get("saved", False)
-    logs = get_event_logs(current_user.id)
+    logs   = get_event_logs(current_user.id)
+    streak = get_streak(current_user.id)
     return render_template("index.html", config=config, blocking=blocking,
-                           saved=saved, api_token=current_user.api_token, logs=logs)
+                           saved=saved, api_token=current_user.api_token,
+                           logs=logs, streak=streak)
 
 
 @app.route("/save", methods=["POST"])

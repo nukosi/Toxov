@@ -194,6 +194,31 @@ def add_event_log(user_id, event):
         session.commit()
 
 
+def get_streak(user_id):
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    with Session(engine) as session:
+        last_emergency = (
+            session.query(EventLog)
+            .filter_by(user_id=user_id, event="emergency_unblock")
+            .order_by(EventLog.id.desc())
+            .first()
+        )
+        # 緊急解除したことがある場合：最後の緊急解除から何日経つか
+        if last_emergency:
+            return max(0, (now - last_emergency.created_at).days)
+        # 一度も緊急解除していない場合：最初のブロック開始から何日経つか
+        first_block = (
+            session.query(EventLog)
+            .filter_by(user_id=user_id, event="block_start")
+            .order_by(EventLog.id.asc())
+            .first()
+        )
+        if first_block:
+            return (now - first_block.created_at).days
+        return 0
+
+
 def get_event_logs(user_id, limit=30):
     with Session(engine) as session:
         logs = (
