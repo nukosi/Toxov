@@ -7,13 +7,16 @@ from database import (init_db, load_config, save_config,
                       set_emergency_unblock, add_event_log, get_event_logs)
 
 app = Flask(__name__)
+# 本番環境では環境変数 SECRET_KEY に強いランダム文字列を設定すること
 app.secret_key = os.environ.get("SECRET_KEY", "nukosisnsblocker-secret-key-change-this-later")
 
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
+# RailwayサーバーはUTCなので、表示・判定にはJSTに変換して使う
 JST = datetime.timezone(datetime.timedelta(hours=9))
 
+# gunicornはif __name__ == "__main__"を通らないのでここで初期化する
 init_db()
 
 
@@ -127,6 +130,7 @@ def api_log(token):
     if not user:
         return jsonify({"error": "invalid token"}), 401
     event = request.json.get("event")
+    # 想定外の値がDBに入らないよう許可リストで絞る
     if event in ("block_start", "block_end", "emergency_unblock"):
         add_event_log(user["id"], event)
     return jsonify({"ok": True})

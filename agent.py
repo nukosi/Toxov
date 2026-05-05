@@ -12,6 +12,7 @@ from tkinter import simpledialog, messagebox
 CONFIG_DIR  = os.path.join(os.environ["APPDATA"], "CutNet")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 HOSTS_FILE  = r"C:\Windows\System32\drivers\etc\hosts"
+# hostsファイルに追記する行の末尾に付けるタグ。unblock時にこのタグで自分が書いた行だけ削除する
 BLOCK_TAG   = "# CutNet"
 JST         = datetime.timezone(datetime.timedelta(hours=9))
 POLL_INTERVAL = 30  # seconds
@@ -25,6 +26,7 @@ def is_admin():
 
 
 def relaunch_as_admin():
+    # hostsファイルの書き換えには管理者権限が必要なので、UACで昇格して自分自身を再起動する
     ctypes.windll.shell32.ShellExecuteW(
         None, "runas", sys.executable, " ".join(sys.argv), None, 1
     )
@@ -32,6 +34,7 @@ def relaunch_as_admin():
 
 
 def first_run_setup():
+    # 初回起動時のみ実行。PC連携トークンURLを入力させてAppDataに保存する
     root = tk.Tk()
     root.withdraw()
 
@@ -59,6 +62,8 @@ def first_run_setup():
 
 
 def register_autostart():
+    # Windowsタスクスケジューラにログオン時の自動起動を登録する
+    # RunLevel Highest = 管理者として起動（UACダイアログなし）
     exe = sys.executable
     ps = f"""
 $action   = New-ScheduledTaskAction -Execute '{exe}'
@@ -84,6 +89,7 @@ def should_be_blocked(config):
 
 
 def block(sites):
+    # 既存のエントリと重複しないよう先に全文を読んでから追記する
     with open(HOSTS_FILE, "r") as f:
         content = f.read()
     with open(HOSTS_FILE, "a") as f:
@@ -91,10 +97,12 @@ def block(sites):
             entry = f"0.0.0.0 {site} {BLOCK_TAG}\n"
             if entry not in content:
                 f.write(entry)
+    # ブラウザの内部DNSキャッシュはタブを閉じるまで残るが、OSキャッシュはここでクリアする
     subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
 
 
 def unblock():
+    # BLOCK_TAGが含まれる行だけ除いて書き直す
     with open(HOSTS_FILE, "r") as f:
         lines = f.readlines()
     with open(HOSTS_FILE, "w") as f:
@@ -126,6 +134,7 @@ def apply_config(config, current_state, last_version, log):
     """
     version        = config.get("version")
     emergency      = config.get("emergency_unblock", False)
+    # versionが変わったときだけblock()を呼び直してサイト一覧の変更を反映する
     config_changed = version != last_version
     events         = []
 
@@ -175,6 +184,7 @@ def main():
 
     log(f"起動 URL={cloud_url}")
 
+    # config URLからlogのURLを導出する（トークンは共通）
     log_url       = cloud_url.replace("/api/config/", "/api/log/")
     current_state = None
     last_version  = None

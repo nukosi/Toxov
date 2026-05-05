@@ -9,7 +9,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 
+# 環境変数DATABASE_URLがあればPostgreSQL（Railway）、なければローカルのSQLiteを使う
 _url = os.environ.get("DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'nukosisnsblocker.db')}")
+# 古いRailwayは "postgres://" を返すがSQLAlchemyは "postgresql://" を要求するため変換する
 if _url.startswith("postgres://"):
     _url = _url.replace("postgres://", "postgresql://", 1)
 
@@ -60,6 +62,8 @@ def init_db():
 
 
 def _migrate():
+    # 既存のDBを壊さずにカラムを追加するためのスキーママイグレーション
+    # 新しいカラムを追加したときはここに ALTER TABLE を追記する
     from sqlalchemy import text, inspect
     with engine.connect() as conn:
         inspector = inspect(engine)
@@ -173,6 +177,7 @@ def add_event_log(user_id, event):
         session.add(EventLog(
             user_id    = user_id,
             event      = event,
+            # SQLAlchemyのDateTimeはtzinfoなしを期待するため、JSTで取得後にtzinfoを除去する
             created_at = datetime.datetime.now(JST).replace(tzinfo=None),
         ))
         session.commit()
