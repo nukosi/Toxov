@@ -172,6 +172,13 @@
         <p class="hint">1行に1サイト。例: instagram.com</p>
       </div>
 
+      <!-- アプリ一覧 -->
+      <div class="card">
+        <h2>ブロックするアプリ</h2>
+        <textarea name="apps">{{ config.apps | join('\n') }}</textarea>
+        <p class="hint">1行に1つ、実行ファイルのフルパスを入力。例: C:\Program Files\...\game.exe</p>
+      </div>
+
       <button type="submit" class="btn btn-primary">設定を保存</button>
     </form>
 

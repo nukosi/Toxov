@@ -97,8 +97,10 @@ def save():
     block_start = request.form["block_start"]
     block_end   = request.form["block_end"]
     sites_raw   = request.form.get("sites", "")
+    apps_raw    = request.form.get("apps", "")
     sites       = [s.strip() for s in sites_raw.splitlines() if s.strip()]
-    save_config(current_user.id, block_start, block_end, sites)
+    apps        = [a.strip() for a in apps_raw.splitlines() if a.strip()]
+    save_config(current_user.id, block_start, block_end, sites, apps)
     return redirect(url_for("index", saved=1))
 
 

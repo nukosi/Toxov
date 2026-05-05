@@ -88,7 +88,8 @@ def should_be_blocked(config):
     return datetime.time(sh, sm) <= now < datetime.time(eh, em)
 
 
-def block(sites):
+def block(sites, apps):
+    # --- Webサイト：hostsファイルで遮断 ---
     # 既存のエントリと重複しないよう先に全文を読んでから追記する
     with open(HOSTS_FILE, "r") as f:
         content = f.read()
@@ -100,8 +101,22 @@ def block(sites):
     # ブラウザの内部DNSキャッシュはタブを閉じるまで残るが、OSキャッシュはここでクリアする
     subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
 
+    # --- アプリ：Windowsファイアウォールで遮断 ---
+    # 既存のCutNetルールを一旦全削除してから再登録する（削除されたappの残留を防ぐ）
+    subprocess.run(
+        ["netsh", "advfirewall", "firewall", "delete", "rule", "name=CutNet"],
+        capture_output=True
+    )
+    for path in apps:
+        if os.path.exists(path):
+            subprocess.run([
+                "netsh", "advfirewall", "firewall", "add", "rule",
+                "name=CutNet", "dir=out", "action=block", f"program={path}"
+            ], capture_output=True)
+
 
 def unblock():
+    # --- Webサイト解除 ---
     # BLOCK_TAGが含まれる行だけ除いて書き直す
     with open(HOSTS_FILE, "r") as f:
         lines = f.readlines()
@@ -110,6 +125,12 @@ def unblock():
             if BLOCK_TAG not in line:
                 f.write(line)
     subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
+
+    # --- アプリ解除：CutNetという名前のファイアウォールルールをすべて削除 ---
+    subprocess.run(
+        ["netsh", "advfirewall", "firewall", "delete", "rule", "name=CutNet"],
+        capture_output=True
+    )
 
 
 def config_stream(url, log):
@@ -151,7 +172,7 @@ def apply_config(config, current_state, last_version, log):
 
     if should_block:
         if config_changed or current_state is not True:
-            block(config.get("sites", []))
+            block(config.get("sites", []), config.get("apps", []))
         if current_state is not True:
             log("ブロック 実行")
             events.append("block_start")

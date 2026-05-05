@@ -27,6 +27,7 @@ class UserModel(Base):
     api_token = Column(String, nullable=False, unique=True)
     config    = relationship("Config", back_populates="user", uselist=False, cascade="all, delete-orphan")
     sites     = relationship("Site", back_populates="user", cascade="all, delete-orphan")
+    apps      = relationship("App",  back_populates="user", cascade="all, delete-orphan")
 
 
 class Config(Base):
@@ -46,6 +47,14 @@ class Site(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     domain  = Column(String, nullable=False)
     user    = relationship("UserModel", back_populates="sites")
+
+
+class App(Base):
+    __tablename__ = "apps"
+    id      = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    path    = Column(String, nullable=False)
+    user    = relationship("UserModel", back_populates="apps")
 
 
 class EventLog(Base):
@@ -153,11 +162,13 @@ def load_config(user_id):
         sites  = session.query(Site).filter_by(user_id=user_id).all()
         if not config:
             return {"block_start": "08:00", "block_end": "21:00", "sites": []}
+        apps = session.query(App).filter_by(user_id=user_id).all()
         return {
             "version":          config.version or 0,
             "block_start":      config.block_start,
             "block_end":        config.block_end,
             "sites":            [s.domain for s in sites],
+            "apps":             [a.path for a in apps],
             "emergency_unblock": config.emergency_unblock or False,
         }
 
@@ -195,7 +206,7 @@ def get_event_logs(user_id, limit=30):
         return [{"event": l.event, "created_at": l.created_at.strftime("%m/%d %H:%M:%S")} for l in logs]
 
 
-def save_config(user_id, block_start, block_end, sites):
+def save_config(user_id, block_start, block_end, sites, apps=None):
     with Session(engine) as session:
         config = session.query(Config).filter_by(user_id=user_id).first()
         if not config:
@@ -208,4 +219,7 @@ def save_config(user_id, block_start, block_end, sites):
         session.query(Site).filter_by(user_id=user_id).delete()
         for domain in sites:
             session.add(Site(user_id=user_id, domain=domain))
+        session.query(App).filter_by(user_id=user_id).delete()
+        for path in (apps or []):
+            session.add(App(user_id=user_id, path=path))
         session.commit()
