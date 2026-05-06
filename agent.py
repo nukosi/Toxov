@@ -5,6 +5,7 @@ import time
 import datetime
 import subprocess
 import ctypes
+import winreg
 import requests
 import tkinter as tk
 from tkinter import simpledialog, messagebox
@@ -90,6 +91,28 @@ def load_local_config():
         return json.load(f)
 
 
+def set_doh_policy(disable: bool):
+    # Edge・ChromeのDNS over HTTPSをレジストリのグループポリシーで制御する
+    # disable=True でDoHを強制オフ（hostsファイルが有効になる）
+    # disable=False でポリシーを削除しブラウザのデフォルト動作に戻す
+    targets = [
+        r"SOFTWARE\Policies\Microsoft\Edge",
+        r"SOFTWARE\Policies\Google\Chrome",
+    ]
+    for key_path in targets:
+        try:
+            with winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, key_path) as key:
+                if disable:
+                    winreg.SetValueEx(key, "DnsOverHttpsMode", 0, winreg.REG_SZ, "off")
+                else:
+                    try:
+                        winreg.DeleteValue(key, "DnsOverHttpsMode")
+                    except FileNotFoundError:
+                        pass
+        except Exception:
+            pass
+
+
 def should_be_blocked(config):
     """ローカル時刻で判定。サーバー不要。"""
     now = datetime.datetime.now(JST).time()
@@ -99,6 +122,9 @@ def should_be_blocked(config):
 
 
 def block(sites, apps):
+    # --- Edge/ChromeのDoHを無効化（hostsファイルが機能するようにする） ---
+    set_doh_policy(disable=True)
+
     # --- Webサイト：hostsファイルで遮断 ---
     # 既存のエントリと重複しないよう先に全文を読んでから追記する
     with open(HOSTS_FILE, "r") as f:
@@ -126,6 +152,9 @@ def block(sites, apps):
 
 
 def unblock():
+    # --- Edge/ChromeのDoHポリシーを削除してデフォルト動作に戻す ---
+    set_doh_policy(disable=False)
+
     # --- Webサイト解除 ---
     # BLOCK_TAGが含まれる行だけ除いて書き直す
     with open(HOSTS_FILE, "r") as f:
@@ -140,6 +169,27 @@ def unblock():
     subprocess.run(
         ["netsh", "advfirewall", "firewall", "delete", "rule", "name=CutNet"],
         capture_output=True
+    )
+
+
+def notify(message):
+    # Windows PowerShellのバルーン通知（追加ライブラリ不要）
+    # NotifyIconはGCされると消えるので Start-Sleep で表示を維持してから破棄する
+    ps = (
+        "Add-Type -AssemblyName System.Windows.Forms;"
+        "$n = New-Object System.Windows.Forms.NotifyIcon;"
+        "$n.Icon = [System.Drawing.SystemIcons]::Information;"
+        "$n.BalloonTipTitle = 'CutNet';"
+        f"$n.BalloonTipText = '{message}';"
+        "$n.Visible = $true;"
+        "$n.ShowBalloonTip(5000);"
+        "Start-Sleep -Seconds 3;"
+        "$n.Dispose()"
+    )
+    subprocess.Popen(
+        ["powershell", "-WindowStyle", "Hidden", "-Command", ps],
+        # コンソールウィンドウを出さない
+        creationflags=0x08000000,
     )
 
 
@@ -230,6 +280,11 @@ def main():
             config, current_state, last_version, log
         )
         for event in events:
+            # ブロック開始・終了をバルーン通知で知らせる
+            if event == "block_start":
+                notify("ブロック開始しました")
+            elif event == "block_end":
+                notify("ブロック終了しました")
             try:
                 requests.post(log_url, json={"event": event}, timeout=5)
             except Exception:

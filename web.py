@@ -81,13 +81,15 @@ def logout():
 
 
 @app.route("/")
-@login_required
 def index():
-    config  = load_config(current_user.id)
+    # 未ログインはランディングページ、ログイン済みはダッシュボードを返す
+    if not current_user.is_authenticated:
+        return render_template("landing.html")
+    config   = load_config(current_user.id)
     blocking = is_blocking_time(config)
-    saved   = request.args.get("saved", False)
-    logs   = get_event_logs(current_user.id)
-    streak = get_streak(current_user.id)
+    saved    = request.args.get("saved", False)
+    logs     = get_event_logs(current_user.id)
+    streak   = get_streak(current_user.id)
     return render_template("index.html", config=config, blocking=blocking,
                            saved=saved, api_token=current_user.api_token,
                            logs=logs, streak=streak)
