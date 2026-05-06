@@ -10,11 +10,11 @@ import requests
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 
-CONFIG_DIR  = os.path.join(os.environ["APPDATA"], "CutNet")
+CONFIG_DIR  = os.path.join(os.environ["APPDATA"], "Toxov")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 HOSTS_FILE  = r"C:\Windows\System32\drivers\etc\hosts"
 # hostsファイルに追記する行の末尾に付けるタグ。unblock時にこのタグで自分が書いた行だけ削除する
-BLOCK_TAG   = "# CutNet"
+BLOCK_TAG   = "# Toxov"
 JST         = datetime.timezone(datetime.timedelta(hours=9))
 POLL_INTERVAL = 30  # seconds
 
@@ -38,7 +38,7 @@ def ensure_single_instance():
     # Windowsの名前付きMutexで二重起動を防止する
     # CreateMutexWはMutexが既に存在する場合もハンドルを返すが、GetLastErrorが183(ERROR_ALREADY_EXISTS)になる
     # 呼び出し元でmutexの参照を保持し続けること（GCされるとMutexが解放されて二重起動防止が無効になる）
-    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "Global\\CutNet")
+    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "Global\\Toxov")
     if ctypes.windll.kernel32.GetLastError() == 183:
         return None  # 既に別インスタンスが動いている
     return mutex
@@ -50,7 +50,7 @@ def first_run_setup():
     root.withdraw()
 
     url = simpledialog.askstring(
-        "CutNet セットアップ",
+        "Toxov セットアップ",
         "Webサイトの「PC連携トークン」URLを貼り付けてください:",
         parent=root,
     )
@@ -66,7 +66,7 @@ def first_run_setup():
     register_autostart()
 
     messagebox.showinfo(
-        "CutNet セットアップ完了",
+        "Toxov セットアップ完了",
         "設定が完了しました！\nPC起動時に自動でブロックが動作します。",
     )
     root.destroy()
@@ -81,7 +81,7 @@ $action   = New-ScheduledTaskAction -Execute '{exe}'
 $trigger  = New-ScheduledTaskTrigger -AtLogOn
 $principal= New-ScheduledTaskPrincipal -UserId '{os.environ["USERNAME"]}' -RunLevel Highest -LogonType Interactive
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0
-Register-ScheduledTask -TaskName 'CutNet' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force
+Register-ScheduledTask -TaskName 'Toxov' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force
 """
     subprocess.run(["powershell", "-Command", ps], capture_output=True)
 
@@ -138,16 +138,16 @@ def block(sites, apps):
     subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
 
     # --- アプリ：Windowsファイアウォールで遮断 ---
-    # 既存のCutNetルールを一旦全削除してから再登録する（削除されたappの残留を防ぐ）
+    # 既存のToxovルールを一旦全削除してから再登録する（削除されたappの残留を防ぐ）
     subprocess.run(
-        ["netsh", "advfirewall", "firewall", "delete", "rule", "name=CutNet"],
+        ["netsh", "advfirewall", "firewall", "delete", "rule", "name=Toxov"],
         capture_output=True
     )
     for path in apps:
         if os.path.exists(path):
             subprocess.run([
                 "netsh", "advfirewall", "firewall", "add", "rule",
-                "name=CutNet", "dir=out", "action=block", f"program={path}"
+                "name=Toxov", "dir=out", "action=block", f"program={path}"
             ], capture_output=True)
 
 
@@ -165,9 +165,9 @@ def unblock():
                 f.write(line)
     subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
 
-    # --- アプリ解除：CutNetという名前のファイアウォールルールをすべて削除 ---
+    # --- アプリ解除：Toxovという名前のファイアウォールルールをすべて削除 ---
     subprocess.run(
-        ["netsh", "advfirewall", "firewall", "delete", "rule", "name=CutNet"],
+        ["netsh", "advfirewall", "firewall", "delete", "rule", "name=Toxov"],
         capture_output=True
     )
 
@@ -179,7 +179,7 @@ def notify(message):
         "Add-Type -AssemblyName System.Windows.Forms;"
         "$n = New-Object System.Windows.Forms.NotifyIcon;"
         "$n.Icon = [System.Drawing.SystemIcons]::Information;"
-        "$n.BalloonTipTitle = 'CutNet';"
+        "$n.BalloonTipTitle = 'Toxov';"
         f"$n.BalloonTipText = '{message}';"
         "$n.Visible = $true;"
         "$n.ShowBalloonTip(5000);"
@@ -224,6 +224,8 @@ def apply_config(config, current_state, last_version, log):
     if emergency:
         if current_state is not False:
             unblock()
+        # current_state が True のときだけログに残す（起動時の None → False は記録しない）
+        if current_state is True:
             log("緊急解除 実行")
             events.append("emergency_unblock")
         return False, version, events
@@ -233,13 +235,16 @@ def apply_config(config, current_state, last_version, log):
     if should_block:
         if config_changed or current_state is not True:
             block(config.get("sites", []), config.get("apps", []))
-        if current_state is not True:
+        # False → True の遷移のみ記録（起動時の None → True は記録しない）
+        if current_state is False:
             log("ブロック 実行")
             events.append("block_start")
         return True, version, events
     else:
         if current_state is not False:
             unblock()
+        # True → False の遷移のみ記録（起動時の None → False は記録しない）
+        if current_state is True:
             log("解除 実行")
             events.append("block_end")
         return False, version, events

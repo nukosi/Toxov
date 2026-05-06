@@ -1,4 +1,4 @@
-# CutNet
+# Toxov
 
 指定した時間帯にWebサイト・アプリを自動でブロックするインターネットデトックスツールです。
 
@@ -15,7 +15,7 @@
 
 ### 1. アカウント登録
 
-[CutNet](https://web-production-ed8c9.up.railway.app) にアクセスして新規登録します。
+[Toxov](https://web-production-ed8c9.up.railway.app) にアクセスして新規登録します。
 
 ### 2. 設定
 
@@ -36,9 +36,9 @@ C:\Program Files (x86)\Steam\steamapps\common\ゲーム名\game.exe
 
 Steamゲームのパスを調べるには：Steam ライブラリ → ゲームを右クリック → プロパティ → ローカルファイル → 参照
 
-### 3. CutNet.exe をダウンロード・起動
+### 3. Toxov.exe をダウンロード・起動
 
-[最新版をダウンロード](https://github.com/nukosi/CutNet/releases/latest/download/CutNet.exe)
+[最新版をダウンロード](https://github.com/nukosi/Toxov/releases/latest/download/Toxov.exe)
 
 - 起動するとUAC（管理者権限）の確認が出るので「はい」をクリック
 - 初回起動時にURLの入力ダイアログが出るので、Webサイトの「PC連携トークン」URLを貼り付け

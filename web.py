@@ -144,7 +144,7 @@ def api_log(token):
 
 @app.route("/download")
 def download():
-    return send_from_directory("dist", "CutNet.exe", as_attachment=True)
+    return send_from_directory("dist", "Toxov.exe", as_attachment=True)
 
 
 @app.route("/setup", methods=["GET", "POST"])
@@ -166,6 +166,6 @@ def setup():
 
 
 if __name__ == "__main__":
-    print("CutNet Web UI 起動中...")
+    print("Toxov Web UI 起動中...")
     print("ブラウザで http://localhost:5000 を開いてください")
     app.run(host="0.0.0.0", port=5000, debug=False)
