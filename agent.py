@@ -33,6 +33,16 @@ def relaunch_as_admin():
     sys.exit()
 
 
+def ensure_single_instance():
+    # Windowsの名前付きMutexで二重起動を防止する
+    # CreateMutexWはMutexが既に存在する場合もハンドルを返すが、GetLastErrorが183(ERROR_ALREADY_EXISTS)になる
+    # 呼び出し元でmutexの参照を保持し続けること（GCされるとMutexが解放されて二重起動防止が無効になる）
+    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "Global\\CutNet")
+    if ctypes.windll.kernel32.GetLastError() == 183:
+        return None  # 既に別インスタンスが動いている
+    return mutex
+
+
 def first_run_setup():
     # 初回起動時のみ実行。PC連携トークンURLを入力させてAppDataに保存する
     root = tk.Tk()
@@ -189,6 +199,11 @@ def main():
     if not is_admin():
         relaunch_as_admin()
         return
+
+    # 管理者昇格後に二重起動チェック（非管理者プロセスはすでにsys.exit済みなので競合しない）
+    mutex = ensure_single_instance()
+    if mutex is None:
+        sys.exit(0)
 
     if not os.path.exists(CONFIG_FILE):
         first_run_setup()
