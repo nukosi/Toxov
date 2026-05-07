@@ -127,7 +127,10 @@ def api_config(token):
     user = get_user_by_token(token)
     if not user:
         return jsonify({"error": "invalid token"}), 401
-    return jsonify(load_config(user["id"]))
+    # streakをconfig APIに含めることでモバイルアプリからも参照できるようにする
+    config = load_config(user["id"])
+    config["streak"] = get_streak(user["id"])
+    return jsonify(config)
 
 
 @app.route("/api/log/<token>", methods=["POST"])
