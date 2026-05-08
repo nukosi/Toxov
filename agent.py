@@ -290,7 +290,7 @@ def main():
             if event == "block_start":
                 notify(f"ブロック開始  {get_comment('block_start')}")
             elif event == "block_end":
-                notify("ブロック終了しました")
+                notify(f"ブロック終了  {get_comment('block_end')}")
             try:
                 requests.post(log_url, json={"event": event}, timeout=5)
             except Exception:
