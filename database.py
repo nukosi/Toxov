@@ -251,6 +251,13 @@ def get_event_logs(user_id, limit=30):
         return [{"event": l.event, "created_at": l.created_at.strftime("%m/%d %H:%M:%S")} for l in logs]
 
 
+def has_emergency_history(user_id) -> bool:
+    with Session(engine) as session:
+        return session.query(EventLog).filter_by(
+            user_id=user_id, event="emergency_unblock"
+        ).first() is not None
+
+
 def set_user_plan(user_id, plan: str):
     with Session(engine) as session:
         user = session.get(UserModel, user_id)

@@ -9,6 +9,7 @@ import winreg
 import requests
 import tkinter as tk
 from tkinter import simpledialog, messagebox
+from comments import get_comment
 
 CONFIG_DIR  = os.path.join(os.environ["APPDATA"], "Toxov")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
@@ -287,7 +288,7 @@ def main():
         for event in events:
             # ブロック開始・終了をバルーン通知で知らせる
             if event == "block_start":
-                notify("ブロック開始しました")
+                notify(f"ブロック開始  {get_comment('block_start')}")
             elif event == "block_end":
                 notify("ブロック終了しました")
             try:
