@@ -4,7 +4,9 @@ import os
 import datetime
 from database import (init_db, load_config, save_config,
                       verify_password, create_user, get_user_by_id, get_user_by_token,
-                      set_emergency_unblock, add_event_log, get_event_logs, get_streak)
+                      set_emergency_unblock, add_event_log, get_event_logs, get_streak,
+                      set_user_plan)
+from plans import get_limits, within_site_limit, within_app_limit
 
 app = Flask(__name__)
 # 本番環境では環境変数 SECRET_KEY に強いランダム文字列を設定すること
@@ -21,16 +23,19 @@ init_db()
 
 
 class User(UserMixin):
-    def __init__(self, id, username, api_token):
+    def __init__(self, id, username, api_token, plan="free", role="user"):
         self.id        = id
         self.username  = username
         self.api_token = api_token
+        self.plan      = plan
+        self.role      = role
 
 
 @login_manager.user_loader
 def load_user(user_id):
     data = get_user_by_id(int(user_id))
-    return User(data["id"], data["username"], data["api_token"]) if data else None
+    return User(data["id"], data["username"], data["api_token"],
+                data.get("plan", "free"), data.get("role", "user")) if data else None
 
 
 def is_blocking_time(config):
@@ -67,7 +72,8 @@ def login():
         user = verify_password(request.form["username"], request.form["password"])
         if user:
             data = get_user_by_id(user["id"])
-            login_user(User(data["id"], data["username"], data["api_token"]))
+            login_user(User(data["id"], data["username"], data["api_token"],
+                           data.get("plan", "free"), data.get("role", "user")))
             return redirect(url_for("index"))
         error = "ユーザー名またはパスワードが違います"
     return render_template("login.html", error=error)
@@ -88,11 +94,15 @@ def index():
     config   = load_config(current_user.id)
     blocking = is_blocking_time(config)
     saved    = request.args.get("saved", False)
+    error    = request.args.get("error")
     logs     = get_event_logs(current_user.id)
     streak   = get_streak(current_user.id)
+    limits   = get_limits(current_user.plan)
     return render_template("index.html", config=config, blocking=blocking,
                            saved=saved, api_token=current_user.api_token,
-                           logs=logs, streak=streak)
+                           logs=logs, streak=streak, error=error,
+                           plan=current_user.plan, limits=limits,
+                           role=current_user.role)
 
 
 @app.route("/save", methods=["POST"])
@@ -104,6 +114,27 @@ def save():
     apps_raw    = request.form.get("apps", "")
     sites       = [s.strip() for s in sites_raw.splitlines() if s.strip()]
     apps        = [a.strip() for a in apps_raw.splitlines() if a.strip()]
+
+    config   = load_config(current_user.id)
+    blocking = is_blocking_time(config)
+
+    if blocking:
+        # ブロック時間中はスケジュール変更不可
+        if block_start != config["block_start"] or block_end != config["block_end"]:
+            return redirect(url_for("index", error="blocking"))
+        # ブロック時間中はサイト削除不可（追加のみ許可）
+        if not set(config["sites"]).issubset(set(sites)):
+            return redirect(url_for("index", error="blocking"))
+        # ブロック時間中はアプリ削除不可（追加のみ許可）
+        if not set(config["apps"]).issubset(set(apps)):
+            return redirect(url_for("index", error="blocking"))
+
+    # プランの上限チェック
+    if not within_site_limit(current_user.plan, len(sites)):
+        return redirect(url_for("index", error="site_limit"))
+    if not within_app_limit(current_user.plan, len(apps)):
+        return redirect(url_for("index", error="app_limit"))
+
     save_config(current_user.id, block_start, block_end, sites, apps)
     return redirect(url_for("index", saved=1))
 
@@ -119,6 +150,18 @@ def emergency():
 @login_required
 def resume():
     set_emergency_unblock(current_user.id, False)
+    return redirect(url_for("index"))
+
+
+@app.route("/admin/set-plan", methods=["POST"])
+@login_required
+def admin_set_plan():
+    # admin ロール以外は何もせずトップへ
+    if current_user.role != "admin":
+        return redirect(url_for("index"))
+    plan = request.form.get("plan")
+    if plan in ("free", "premium"):
+        set_user_plan(current_user.id, plan)
     return redirect(url_for("index"))
 
 

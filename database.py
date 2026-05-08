@@ -25,6 +25,8 @@ class UserModel(Base):
     username  = Column(String, nullable=False, unique=True)
     password  = Column(String, nullable=False)
     api_token = Column(String, nullable=False, unique=True)
+    plan      = Column(String, nullable=False, default="free")
+    role      = Column(String, nullable=False, default="user")
     config    = relationship("Config", back_populates="user", uselist=False, cascade="all, delete-orphan")
     sites     = relationship("Site", back_populates="user", cascade="all, delete-orphan")
     apps      = relationship("App",  back_populates="user", cascade="all, delete-orphan")
@@ -86,6 +88,19 @@ def _migrate():
                 conn.execute(text("UPDATE users SET api_token=:t WHERE id=:id"),
                              {"t": token, "id": uid})
             conn.commit()
+        # users テーブルに plan がなければ追加（デフォルト free）
+        if "plan" not in user_columns:
+            conn.execute(text("ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'"))
+            conn.commit()
+        # users テーブルに role がなければ追加（デフォルト user）
+        if "role" not in user_columns:
+            conn.execute(text("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'"))
+            # admin が誰もいなければ最初の登録者（id が最小）を admin に昇格させる
+            first = conn.execute(text("SELECT id FROM users ORDER BY id ASC LIMIT 1")).fetchone()
+            if first:
+                conn.execute(text("UPDATE users SET role='admin' WHERE id=:id"),
+                             {"id": first[0]})
+            conn.commit()
         # config テーブルに user_id がなければ追加
         if "config" in inspector.get_table_names():
             config_columns = [c["name"] for c in inspector.get_columns("config")]
@@ -125,10 +140,14 @@ def create_user(username, password):
         if user:
             user.password = generate_password_hash(password)
         else:
+            # 最初のユーザーを自動的に admin にする
+            is_first = session.query(UserModel).count() == 0
             user = UserModel(
                 username=username,
                 password=generate_password_hash(password),
                 api_token=token,
+                plan="free",
+                role="admin" if is_first else "user",
             )
             session.add(user)
             session.flush()
@@ -139,7 +158,8 @@ def create_user(username, password):
 def get_user_by_id(user_id):
     with Session(engine) as session:
         user = session.get(UserModel, user_id)
-        return {"id": user.id, "username": user.username, "api_token": user.api_token} if user else None
+        return {"id": user.id, "username": user.username, "api_token": user.api_token,
+                "plan": user.plan or "free", "role": user.role or "user"} if user else None
 
 
 def get_user_by_token(token):
@@ -229,6 +249,14 @@ def get_event_logs(user_id, limit=30):
             .all()
         )
         return [{"event": l.event, "created_at": l.created_at.strftime("%m/%d %H:%M:%S")} for l in logs]
+
+
+def set_user_plan(user_id, plan: str):
+    with Session(engine) as session:
+        user = session.get(UserModel, user_id)
+        if user:
+            user.plan = plan
+            session.commit()
 
 
 def save_config(user_id, block_start, block_end, sites, apps=None):

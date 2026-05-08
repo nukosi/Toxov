@@ -130,6 +130,52 @@
       margin-bottom: 16px;
       font-size: 0.9rem;
     }
+
+    .error-banner {
+      background: #3a1e1e;
+      border: 1px solid #5a2d2d;
+      color: #ff6b6b;
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+
+    .lock-notice {
+      font-size: 0.78rem;
+      color: #ffa94d;
+      margin-top: 8px;
+    }
+
+    input[readonly] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .plan-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #252525;
+      color: #888;
+      border: 1px solid #333;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    .plan-badge.premium {
+      background: #2a2010;
+      color: #ffa94d;
+      border-color: #5a4010;
+    }
+
+    .limit-hint {
+      font-size: 0.78rem;
+      color: #666;
+      margin-top: 6px;
+    }
   </style>
 </head>
 <body>
@@ -163,30 +209,57 @@
     <div class="saved-banner">設定を保存しました</div>
     {% endif %}
 
+    {% if error == "blocking" %}
+    <div class="error-banner">ブロック時間中はスケジュール変更・削除はできません</div>
+    {% elif error == "site_limit" %}
+    <div class="error-banner">無料プランではサイトを{{ limits.max_sites }}件まで登録できます</div>
+    {% elif error == "app_limit" %}
+    <div class="error-banner">無料プランではアプリを{{ limits.max_apps }}件まで登録できます</div>
+    {% endif %}
+
     <form action="/save" method="post">
       <!-- ブロック時間 -->
       <div class="card">
         <h2>ブロック時間</h2>
         <div class="time-row">
           <label>開始</label>
-          <input type="time" name="block_start" value="{{ config.block_start }}" required>
+          <input type="time" name="block_start" value="{{ config.block_start }}"
+                 {% if blocking %}readonly{% endif %} required>
           <label style="margin-left:8px;">終了</label>
-          <input type="time" name="block_end" value="{{ config.block_end }}" required>
+          <input type="time" name="block_end" value="{{ config.block_end }}"
+                 {% if blocking %}readonly{% endif %} required>
         </div>
+        {% if blocking %}
+        <p class="lock-notice">ブロック時間中は変更できません</p>
+        {% endif %}
       </div>
 
       <!-- サイト一覧 -->
       <div class="card">
-        <h2>ブロックするサイト</h2>
+        <h2>ブロックするサイト
+          <span class="plan-badge {% if plan == 'premium' %}premium{% endif %}">
+            {% if plan == 'premium' %}Premium{% else %}{{ config.sites | length }}/{{ limits.max_sites }}{% endif %}
+          </span>
+        </h2>
         <textarea name="sites">{{ config.sites | join('\n') }}</textarea>
         <p class="hint">1行に1サイト。例: instagram.com</p>
+        {% if blocking %}
+        <p class="lock-notice">ブロック時間中は削除できません（追加のみ可能）</p>
+        {% endif %}
       </div>
 
       <!-- アプリ一覧 -->
       <div class="card">
-        <h2>ブロックするアプリ</h2>
+        <h2>ブロックするアプリ
+          <span class="plan-badge {% if plan == 'premium' %}premium{% endif %}">
+            {% if plan == 'premium' %}Premium{% else %}{{ config.apps | length }}/{{ limits.max_apps }}{% endif %}
+          </span>
+        </h2>
         <textarea name="apps">{{ config.apps | join('\n') }}</textarea>
         <p class="hint">1行に1つ、実行ファイルのフルパスを入力。例: C:\Program Files\...\game.exe</p>
+        {% if blocking %}
+        <p class="lock-notice">ブロック時間中は削除できません（追加のみ可能）</p>
+        {% endif %}
       </div>
 
       <button type="submit" class="btn btn-primary">設定を保存</button>
@@ -240,6 +313,43 @@
         https://{{ request.host }}/api/config/{{ api_token }}
       </code>
     </div>
+
+    {% if role == "admin" %}
+    <!-- 開発者モード（admin のみ表示） -->
+    <div class="card" style="margin-top:16px; border-color:#2a2a3a;">
+      <h2 style="color:#6c7bd4;">開発者モード
+        <span style="font-size:0.7rem; font-weight:400; color:#555; text-transform:none; letter-spacing:0; margin-left:6px;">admin</span>
+      </h2>
+      <p style="font-size:0.8rem; color:#555; margin-bottom:12px;">プランを切り替えて制限の動作を確認できます</p>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+        <span style="font-size:0.82rem; color:#888;">現在のプラン:</span>
+        <span style="font-size:0.82rem; font-weight:600;
+          {% if plan == 'premium' %}color:#ffa94d;{% else %}color:#aaa;{% endif %}">
+          {{ plan }}
+        </span>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <form action="/admin/set-plan" method="post" style="flex:1;">
+          <input type="hidden" name="plan" value="free">
+          <button type="submit" class="btn"
+            style="width:100%; background:{% if plan == 'free' %}#333{% else %}#252525{% endif %};
+                   color:{% if plan == 'free' %}#e0e0e0{% else %}#555{% endif %};
+                   border:1px solid #333;">
+            free
+          </button>
+        </form>
+        <form action="/admin/set-plan" method="post" style="flex:1;">
+          <input type="hidden" name="plan" value="premium">
+          <button type="submit" class="btn"
+            style="width:100%; background:{% if plan == 'premium' %}#2a2010{% else %}#252525{% endif %};
+                   color:{% if plan == 'premium' %}#ffa94d{% else %}#555{% endif %};
+                   border:1px solid {% if plan == 'premium' %}#5a4010{% else %}#333{% endif %};">
+            premium
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
   </div>
 </body>
 </html>
