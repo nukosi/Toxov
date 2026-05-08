@@ -193,6 +193,38 @@
       <p style="font-size:0.8rem; color:#666; margin-top:4px;">{{ comment }}</p>
     </div>
 
+    <!-- 継続率カード -->
+    <div class="card" style="margin-bottom:16px;">
+      <h2>継続率</h2>
+      <div style="display:flex; gap:12px;">
+        <div style="flex:1; text-align:center;">
+          <p style="font-size:0.75rem; color:#666; margin-bottom:6px;">今週</p>
+          {% if weekly_rate.rate is not none %}
+            <p style="font-size:1.6rem; font-weight:700; letter-spacing:-0.5px; color:
+              {% if weekly_rate.rate >= 80 %}#69db7c{% elif weekly_rate.rate >= 50 %}#ffa94d{% else %}#ff6b6b{% endif %};">
+              {{ weekly_rate.rate }}%
+            </p>
+            <p style="font-size:0.72rem; color:#555; margin-top:2px;">{{ weekly_rate.success }}/{{ weekly_rate.total }}日</p>
+          {% else %}
+            <p style="font-size:0.85rem; color:#444;">データなし</p>
+          {% endif %}
+        </div>
+        <div style="width:1px; background:#2a2a2a;"></div>
+        <div style="flex:1; text-align:center;">
+          <p style="font-size:0.75rem; color:#666; margin-bottom:6px;">今月</p>
+          {% if monthly_rate.rate is not none %}
+            <p style="font-size:1.6rem; font-weight:700; letter-spacing:-0.5px; color:
+              {% if monthly_rate.rate >= 80 %}#69db7c{% elif monthly_rate.rate >= 50 %}#ffa94d{% else %}#ff6b6b{% endif %};">
+              {{ monthly_rate.rate }}%
+            </p>
+            <p style="font-size:0.72rem; color:#555; margin-top:2px;">{{ monthly_rate.success }}/{{ monthly_rate.total }}日</p>
+          {% else %}
+            <p style="font-size:0.85rem; color:#444;">データなし</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
     <div class="status">
       {% if config.emergency_unblock %}
         <span class="dot" style="background:#ffa94d; box-shadow:0 0 6px #ffa94d;"></span>

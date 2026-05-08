@@ -251,6 +251,31 @@ def get_event_logs(user_id, limit=30):
         return [{"event": l.event, "created_at": l.created_at.strftime("%m/%d %H:%M:%S")} for l in logs]
 
 
+def get_success_rate(user_id, days: int) -> dict:
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    since = now - datetime.timedelta(days=days)
+    with Session(engine) as session:
+        logs = (
+            session.query(EventLog)
+            .filter(EventLog.user_id == user_id, EventLog.created_at >= since)
+            .all()
+        )
+    # 日ごとにブロックがあった日・緊急解除があった日を集計する
+    days_with_block     = set()
+    days_with_emergency = set()
+    for log in logs:
+        day = log.created_at.date()
+        if log.event == "block_start":
+            days_with_block.add(day)
+        elif log.event == "emergency_unblock":
+            days_with_emergency.add(day)
+    total   = len(days_with_block)
+    success = len(days_with_block - days_with_emergency)
+    rate    = round(success / total * 100) if total > 0 else None
+    return {"rate": rate, "success": success, "total": total}
+
+
 def has_emergency_history(user_id) -> bool:
     with Session(engine) as session:
         return session.query(EventLog).filter_by(

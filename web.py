@@ -5,7 +5,7 @@ import datetime
 from database import (init_db, load_config, save_config,
                       verify_password, create_user, get_user_by_id, get_user_by_token,
                       set_emergency_unblock, add_event_log, get_event_logs, get_streak,
-                      set_user_plan, has_emergency_history)
+                      set_user_plan, has_emergency_history, get_success_rate)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 
@@ -105,14 +105,17 @@ def index():
     saved    = request.args.get("saved", False)
     error    = request.args.get("error")
     logs     = get_event_logs(current_user.id)
-    streak   = get_streak(current_user.id)
-    semoji   = streak_emoji(streak)
-    phase    = get_phase(streak, has_emergency_history(current_user.id))
-    comment  = get_comment(phase)
+    streak       = get_streak(current_user.id)
+    semoji       = streak_emoji(streak)
+    phase        = get_phase(streak, has_emergency_history(current_user.id))
+    comment      = get_comment(phase)
+    weekly_rate  = get_success_rate(current_user.id, 7)
+    monthly_rate = get_success_rate(current_user.id, 30)
     limits   = get_limits(current_user.plan)
     return render_template("index.html", config=config, blocking=blocking,
                            saved=saved, api_token=current_user.api_token,
-                           logs=logs, streak=streak, semoji=semoji, comment=comment, error=error,
+                           logs=logs, streak=streak, semoji=semoji, comment=comment,
+                           weekly_rate=weekly_rate, monthly_rate=monthly_rate, error=error,
                            plan=current_user.plan, limits=limits,
                            role=current_user.role)
 
