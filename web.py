@@ -8,7 +8,8 @@ from database import (init_db, load_config, save_config,
                       set_user_plan, has_emergency_history, get_success_rate,
                       apply_event_points, get_user_points, get_season_ranking, get_rank,
                       get_user_by_connect_code, get_user_by_email, set_user_email,
-                      create_reset_token, verify_reset_token, consume_reset_token, update_password)
+                      create_reset_token, verify_reset_token, consume_reset_token, update_password,
+                      add_app_to_config)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 from mailer import send_password_reset
@@ -250,6 +251,24 @@ def api_config(token):
     config = load_config(user["id"])
     config["streak"] = get_streak(user["id"])
     return jsonify(config)
+
+
+@app.route("/api/apps/add/<token>", methods=["POST"])
+def api_apps_add(token):
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    path = (request.json or {}).get("path", "").strip()
+    # .exe 以外は拒否する（パストラバーサル等を防ぐ簡易チェック）
+    if not path.lower().endswith(".exe"):
+        return jsonify({"error": "invalid path"}), 400
+    # プランの上限チェック
+    full_user = get_user_by_id(user["id"])
+    config    = load_config(user["id"])
+    if not within_app_limit(full_user["plan"], len(config["apps"]) + 1):
+        return jsonify({"error": "app_limit"}), 403
+    add_app_to_config(user["id"], path)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/log/<token>", methods=["POST"])

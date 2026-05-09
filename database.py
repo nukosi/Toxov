@@ -562,6 +562,21 @@ def get_season_ranking(limit=10) -> list:
         return [{"username": r[0], "season_points": r[1], "lifetime_points": r[2]} for r in rows]
 
 
+def add_app_to_config(user_id: int, path: str) -> bool:
+    """エージェントのトレイUIからアプリパスを追加する。重複は無視してFalseを返す。"""
+    with Session(engine) as session:
+        exists = session.query(App).filter_by(user_id=user_id, path=path).first()
+        if exists:
+            return False
+        session.add(App(user_id=user_id, path=path))
+        # バージョンをインクリメントして次のpollでエージェントに即時反映させる
+        config = session.query(Config).filter_by(user_id=user_id).first()
+        if config:
+            config.version = (config.version or 0) + 1
+        session.commit()
+    return True
+
+
 def save_config(user_id, block_start, block_end, sites, apps=None):
     with Session(engine) as session:
         config = session.query(Config).filter_by(user_id=user_id).first()

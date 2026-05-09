@@ -6,9 +6,12 @@ import datetime
 import subprocess
 import ctypes
 import winreg
+import threading
 import requests
 import tkinter as tk
-from tkinter import simpledialog, messagebox
+from tkinter import simpledialog, messagebox, filedialog
+import pystray
+from PIL import Image, ImageDraw
 from comments import get_comment
 
 # ドメイン取得時はここだけ変える
@@ -213,6 +216,65 @@ def notify(message):
     )
 
 
+# ポーリングスレッドとトレイ間でブロック状態を共有するための辞書
+_tray_state = {"blocking": None}
+
+
+def make_icon(blocking) -> Image.Image:
+    # ブロック中は赤、解除中は緑のシンプルな円アイコン
+    img  = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    color = "#ff4444" if blocking else "#44cc44"
+    draw.ellipse([6, 6, 58, 58], fill=color)
+    return img
+
+
+def setup_tray(add_url: str, log) -> pystray.Icon:
+    def status_text(item):
+        if _tray_state["blocking"] is True:
+            return "ブロック中"
+        if _tray_state["blocking"] is False:
+            return "解除中"
+        return "起動中..."
+
+    def add_app(icon, item):
+        # tkinterのファイルダイアログでexeを選択してサーバーに送信する
+        root = tk.Tk()
+        root.withdraw()
+        root.wm_attributes("-topmost", True)
+        path = filedialog.askopenfilename(
+            parent=root,
+            title="ブロックするアプリを選択",
+            filetypes=[("実行ファイル", "*.exe"), ("すべてのファイル", "*.*")],
+        )
+        root.destroy()
+        if not path:
+            return
+        path = os.path.normpath(path)
+        try:
+            res = requests.post(add_url, json={"path": path}, timeout=5)
+            if res.ok:
+                notify(f"追加: {os.path.basename(path)}")
+            else:
+                notify("追加に失敗しました（上限に達している可能性があります）")
+        except Exception as e:
+            log(f"アプリ追加エラー: {e}")
+
+    def quit_action(icon, item):
+        # 終了時にhostsとファイアウォールを掃除してからアイコンを閉じる
+        unblock()
+        icon.stop()
+
+    menu = pystray.Menu(
+        pystray.MenuItem(status_text, None, enabled=False),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("アプリを追加", add_app),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("終了", quit_action),
+    )
+    return pystray.Icon("Toxov", make_icon(False), "Toxov", menu)
+
+
 def config_stream(url, log):
     """
     設定取得インターフェース。
@@ -295,25 +357,38 @@ def main():
 
     log(f"起動 URL={cloud_url}")
 
-    # config URLからlogのURLを導出する（トークンは共通）
-    log_url       = cloud_url.replace("/api/config/", "/api/log/")
-    current_state = None
-    last_version  = None
+    # config URLからlog・アプリ追加のURLを導出する（トークンは共通）
+    log_url = cloud_url.replace("/api/config/", "/api/log/")
+    add_url = cloud_url.replace("/api/config/", "/api/apps/add/")
 
-    for config in config_stream(cloud_url, log):
-        current_state, last_version, events = apply_config(
-            config, current_state, last_version, log
-        )
-        for event in events:
-            # ブロック開始・終了をバルーン通知で知らせる
-            if event == "block_start":
-                notify(f"ブロック開始  {get_comment('block_start')}")
-            elif event == "block_end":
-                notify(f"ブロック終了  {get_comment('block_end')}")
-            try:
-                requests.post(log_url, json={"event": event}, timeout=5)
-            except Exception:
-                pass
+    # トレイアイコンをメインスレッドで動かすため、ポーリングループを別スレッドに移す
+    tray = setup_tray(add_url, log)
+
+    def polling_loop():
+        current_state = None
+        last_version  = None
+        for config in config_stream(cloud_url, log):
+            current_state, last_version, events = apply_config(
+                config, current_state, last_version, log
+            )
+            # ブロック状態をトレイアイコンに反映する
+            _tray_state["blocking"] = current_state
+            tray.icon = make_icon(current_state is True)
+            for event in events:
+                if event == "block_start":
+                    notify(f"ブロック開始  {get_comment('block_start')}")
+                elif event == "block_end":
+                    notify(f"ブロック終了  {get_comment('block_end')}")
+                try:
+                    requests.post(log_url, json={"event": event}, timeout=5)
+                except Exception:
+                    pass
+
+    # daemon=True にするとメインスレッド（トレイ）が終了したら一緒に終了する
+    threading.Thread(target=polling_loop, daemon=True).start()
+
+    # pystray はメインスレッドをブロックして動作する（Windows の win32 バックエンド要件）
+    tray.run()
 
 
 if __name__ == "__main__":
