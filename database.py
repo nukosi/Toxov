@@ -1,6 +1,7 @@
 import os
 import json
 import secrets
+import string
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, DateTime
 import datetime
 from sqlalchemy.orm import declarative_base, Session, relationship
@@ -25,8 +26,9 @@ class UserModel(Base):
     username  = Column(String, nullable=False, unique=True)
     password  = Column(String, nullable=False)
     api_token = Column(String, nullable=False, unique=True)
-    plan      = Column(String, nullable=False, default="free")
-    role      = Column(String, nullable=False, default="user")
+    plan         = Column(String, nullable=False, default="free")
+    role         = Column(String, nullable=False, default="user")
+    connect_code = Column(String, nullable=True, unique=True)
     config    = relationship("Config", back_populates="user", uselist=False, cascade="all, delete-orphan")
     sites     = relationship("Site", back_populates="user", cascade="all, delete-orphan")
     apps      = relationship("App",  back_populates="user", cascade="all, delete-orphan")
@@ -120,7 +122,16 @@ def _migrate():
         # users テーブルに role がなければ追加（デフォルト user）
         if "role" not in user_columns:
             conn.execute(text("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'"))
-            # admin が誰もいなければ最初の登録者（id が最小）を admin に昇格させる
+            # connect_code がなければ追加して既存ユーザーにも発行する
+        if "connect_code" not in user_columns:
+            conn.execute(text("ALTER TABLE users ADD COLUMN connect_code TEXT"))
+            users = conn.execute(text("SELECT id FROM users")).fetchall()
+            for (uid,) in users:
+                code = _generate_connect_code()
+                conn.execute(text("UPDATE users SET connect_code=:c WHERE id=:id"),
+                             {"c": code, "id": uid})
+            conn.commit()
+        # admin が誰もいなければ最初の登録者（id が最小）を admin に昇格させる
             first = conn.execute(text("SELECT id FROM users ORDER BY id ASC LIMIT 1")).fetchone()
             if first:
                 conn.execute(text("UPDATE users SET role='admin' WHERE id=:id"),
@@ -185,6 +196,7 @@ def create_user(username, password):
                 api_token=token,
                 plan="free",
                 role="admin" if is_first else "user",
+                connect_code=_generate_connect_code(),
             )
             session.add(user)
             session.flush()
@@ -197,7 +209,8 @@ def get_user_by_id(user_id):
     with Session(engine) as session:
         user = session.get(UserModel, user_id)
         return {"id": user.id, "username": user.username, "api_token": user.api_token,
-                "plan": user.plan or "free", "role": user.role or "user"} if user else None
+                "plan": user.plan or "free", "role": user.role or "user",
+                "connect_code": user.connect_code} if user else None
 
 
 def get_user_by_token(token):
@@ -327,6 +340,19 @@ def set_user_plan(user_id, plan: str):
         if user:
             user.plan = plan
             session.commit()
+
+
+def _generate_connect_code() -> str:
+    # 大文字英数字6文字。O・0・I・1 は視認性が悪いので除外する
+    alphabet = [c for c in (string.ascii_uppercase + string.digits)
+                if c not in ("O", "0", "I", "1")]
+    return ''.join(secrets.choice(alphabet) for _ in range(6))
+
+
+def get_user_by_connect_code(code: str):
+    with Session(engine) as session:
+        user = session.query(UserModel).filter_by(connect_code=code.upper()).first()
+        return {"id": user.id, "api_token": user.api_token} if user else None
 
 
 _RANKS = [

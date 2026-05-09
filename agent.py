@@ -11,6 +11,9 @@ import tkinter as tk
 from tkinter import simpledialog, messagebox
 from comments import get_comment
 
+# ドメイン取得時はここだけ変える
+SERVER_BASE = "https://web-production-ed8c9.up.railway.app"
+
 CONFIG_DIR  = os.path.join(os.environ["APPDATA"], "Toxov")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 HOSTS_FILE  = r"C:\Windows\System32\drivers\etc\hosts"
@@ -45,24 +48,40 @@ def ensure_single_instance():
     return mutex
 
 
+def resolve_connect_code(code: str) -> str | None:
+    # 6文字の接続コードをサーバーに送ってconfig URLを取得する
+    try:
+        res = requests.get(f"{SERVER_BASE}/api/connect/{code.strip().upper()}", timeout=10)
+        if res.status_code == 200:
+            return res.json().get("config_url")
+    except Exception:
+        pass
+    return None
+
+
 def first_run_setup():
-    # 初回起動時のみ実行。PC連携トークンURLを入力させてAppDataに保存する
+    # 初回起動時のみ実行。6文字の接続コードを入力させてconfig URLをAppDataに保存する
     root = tk.Tk()
     root.withdraw()
 
-    url = simpledialog.askstring(
-        "Toxov セットアップ",
-        "Webサイトの「PC連携トークン」URLを貼り付けてください:",
-        parent=root,
-    )
+    while True:
+        code = simpledialog.askstring(
+            "Toxov セットアップ",
+            "Webサイトの「PC連携」に表示されている\n6文字のコードを入力してください:",
+            parent=root,
+        )
+        if not code:
+            messagebox.showerror("エラー", "コードが入力されませんでした。")
+            sys.exit(1)
 
-    if not url or not url.strip():
-        messagebox.showerror("エラー", "URLが入力されませんでした。")
-        sys.exit(1)
+        cloud_url = resolve_connect_code(code)
+        if cloud_url:
+            break
+        messagebox.showerror("エラー", "コードが正しくありません。再度入力してください。")
 
     os.makedirs(CONFIG_DIR, exist_ok=True)
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump({"cloud_url": url.strip()}, f)
+        json.dump({"cloud_url": cloud_url}, f)
 
     register_autostart()
 

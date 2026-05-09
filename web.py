@@ -6,7 +6,8 @@ from database import (init_db, load_config, save_config,
                       verify_password, create_user, get_user_by_id, get_user_by_token,
                       set_emergency_unblock, add_event_log, get_event_logs, get_streak,
                       set_user_plan, has_emergency_history, get_success_rate,
-                      apply_event_points, get_user_points, get_season_ranking, get_rank)
+                      apply_event_points, get_user_points, get_season_ranking, get_rank,
+                      get_user_by_connect_code)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 
@@ -25,19 +26,21 @@ init_db()
 
 
 class User(UserMixin):
-    def __init__(self, id, username, api_token, plan="free", role="user"):
-        self.id        = id
-        self.username  = username
-        self.api_token = api_token
-        self.plan      = plan
-        self.role      = role
+    def __init__(self, id, username, api_token, plan="free", role="user", connect_code=None):
+        self.id           = id
+        self.username     = username
+        self.api_token    = api_token
+        self.plan         = plan
+        self.role         = role
+        self.connect_code = connect_code
 
 
 @login_manager.user_loader
 def load_user(user_id):
     data = get_user_by_id(int(user_id))
     return User(data["id"], data["username"], data["api_token"],
-                data.get("plan", "free"), data.get("role", "user")) if data else None
+                data.get("plan", "free"), data.get("role", "user"),
+                data.get("connect_code")) if data else None
 
 
 def streak_emoji(days: int) -> str:
@@ -120,6 +123,7 @@ def index():
     limits   = get_limits(current_user.plan)
     return render_template("index.html", config=config, blocking=blocking,
                            saved=saved, api_token=current_user.api_token,
+                           connect_code=current_user.connect_code,
                            logs=logs, streak=streak, semoji=semoji, comment=comment,
                            weekly_rate=weekly_rate, monthly_rate=monthly_rate,
                            points=points, rank=rank, ranking=ranking, error=error,
@@ -185,6 +189,16 @@ def admin_set_plan():
     if plan in ("free", "premium"):
         set_user_plan(current_user.id, plan)
     return redirect(url_for("index"))
+
+
+@app.route("/api/connect/<code>")
+def api_connect(code):
+    # 短いコードからユーザーのconfig URLを返す（Windowsエージェントの初回セットアップ用）
+    user = get_user_by_connect_code(code)
+    if not user:
+        return jsonify({"error": "invalid code"}), 404
+    config_url = f"https://{request.host}/api/config/{user['api_token']}"
+    return jsonify({"config_url": config_url})
 
 
 @app.route("/api/config/<token>")
