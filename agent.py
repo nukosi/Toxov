@@ -238,22 +238,92 @@ def setup_tray(add_url: str, log) -> pystray.Icon:
         return "起動中..."
 
     def add_app(icon, item):
-        # pystrayのコールバックはメインスレッドではないためtkinterが使えない
-        # PowerShellのOpenFileDialogを subprocess で呼ぶことでスレッドセーフにする
-        # Steamのcommonフォルダがあればそこを、なければCドライブルートを初期ディレクトリにする
-        steam_common = r"C:\Program Files (x86)\Steam\steamapps\common"
-        init_dir = steam_common if os.path.isdir(steam_common) else "C:\\"
-        ps = (
-            "Add-Type -AssemblyName System.Windows.Forms;"
-            "$d = New-Object System.Windows.Forms.OpenFileDialog;"
-            "$d.Title = 'ブロックするアプリを選択';"
-            "$d.Filter = '実行ファイル (*.exe)|*.exe|すべてのファイル (*.*)|*.*';"
-            f"$d.InitialDirectory = '{init_dir}';"
-            "if ($d.ShowDialog() -eq 'OK') { $d.FileName }"
-        )
+        # 実行中プロセスをWindows FormsのListBoxで表示して選ばせる
+        # C:\Windows\ 系とWindowsAppsは除外してユーザーアプリだけを表示する
+        # base64エンコードで渡すことで日本語や特殊文字のエスケープ問題を回避する
+        import base64
+        ps_script = r"""
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$seen = @{}
+$items = [System.Collections.Generic.List[PSCustomObject]]::new()
+Get-Process | ForEach-Object {
+    try {
+        $path = $_.MainModule.FileName
+        if ($path -and
+            -not $path.StartsWith('C:\Windows\') -and
+            -not $path.StartsWith('C:\Program Files\WindowsApps\') -and
+            -not $seen.ContainsKey($path)) {
+            $seen[$path] = $true
+            $items.Add([PSCustomObject]@{ Label = [System.IO.Path]::GetFileName($path); Path = $path })
+        }
+    } catch {}
+}
+$items = $items | Sort-Object Label
+
+$form = New-Object System.Windows.Forms.Form
+$form.Text = 'ブロックするアプリを選択'
+$form.Size = New-Object System.Drawing.Size(520, 460)
+$form.StartPosition = 'CenterScreen'
+$form.TopMost = $true
+$form.FormBorderStyle = 'FixedDialog'
+$form.MaximizeBox = $false
+
+$hint = New-Object System.Windows.Forms.Label
+$hint.Text = 'ブロックしたいアプリを起動してからこの一覧で選んでください'
+$hint.Location = New-Object System.Drawing.Point(12, 10)
+$hint.Size = New-Object System.Drawing.Size(480, 18)
+$hint.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+$form.Controls.Add($hint)
+
+# 各exeのアイコンをImageListに登録する
+$imgList = New-Object System.Windows.Forms.ImageList
+$imgList.ImageSize = New-Object System.Drawing.Size(24, 24)
+$imgList.ColorDepth = 'Depth32Bit'
+
+$lv = New-Object System.Windows.Forms.ListView
+$lv.Location = New-Object System.Drawing.Point(12, 34)
+$lv.Size = New-Object System.Drawing.Size(480, 370)
+$lv.View = 'Details'
+$lv.FullRowSelect = $true
+$lv.MultiSelect = $false
+$lv.Font = New-Object System.Drawing.Font('Segoe UI', 10)
+$lv.SmallImageList = $imgList
+$lv.HeaderStyle = 'None'
+$lv.Columns.Add('name', 460) | Out-Null
+
+$idx = 0
+foreach ($i in $items) {
+    try {
+        $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($i.Path)
+        $imgList.Images.Add($icon) | Out-Null
+        $li = New-Object System.Windows.Forms.ListViewItem($i.Label, $idx)
+        $idx++
+    } catch {
+        $li = New-Object System.Windows.Forms.ListViewItem($i.Label)
+    }
+    $li.Tag = $i.Path
+    $lv.Items.Add($li) | Out-Null
+}
+$form.Controls.Add($lv)
+
+$ok = New-Object System.Windows.Forms.Button
+$ok.Text = '追加'
+$ok.Location = New-Object System.Drawing.Point(420, 412)
+$ok.Size = New-Object System.Drawing.Size(72, 28)
+$ok.DialogResult = 'OK'
+$form.Controls.Add($ok)
+$form.AcceptButton = $ok
+
+if ($form.ShowDialog() -eq 'OK' -and $lv.SelectedItems.Count -gt 0) {
+    $lv.SelectedItems[0].Tag
+}
+"""
+        encoded = base64.b64encode(ps_script.encode("utf-16-le")).decode("ascii")
         result = subprocess.run(
-            ["powershell", "-WindowStyle", "Hidden", "-Command", ps],
-            capture_output=True, text=True, timeout=60,
+            ["powershell", "-WindowStyle", "Hidden", "-EncodedCommand", encoded],
+            capture_output=True, text=True, timeout=120,
         )
         path = result.stdout.strip()
         if not path:
