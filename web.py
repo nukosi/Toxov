@@ -6,7 +6,7 @@ from database import (init_db, load_config, save_config,
                       verify_password, create_user, get_user_by_id, get_user_by_token,
                       set_emergency_unblock, add_event_log, get_event_logs, get_streak,
                       set_user_plan, has_emergency_history, get_success_rate,
-                      apply_event_points, get_user_points, get_season_ranking)
+                      apply_event_points, get_user_points, get_season_ranking, get_rank)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 
@@ -113,13 +113,16 @@ def index():
     weekly_rate  = get_success_rate(current_user.id, 7)
     monthly_rate = get_success_rate(current_user.id, 30)
     points       = get_user_points(current_user.id)
+    rank         = get_rank(points["season_points"])
     ranking      = get_season_ranking()
+    for r in ranking:
+        r["rank"] = get_rank(r["season_points"])
     limits   = get_limits(current_user.plan)
     return render_template("index.html", config=config, blocking=blocking,
                            saved=saved, api_token=current_user.api_token,
                            logs=logs, streak=streak, semoji=semoji, comment=comment,
                            weekly_rate=weekly_rate, monthly_rate=monthly_rate,
-                           points=points, ranking=ranking, error=error,
+                           points=points, rank=rank, ranking=ranking, error=error,
                            plan=current_user.plan, limits=limits,
                            role=current_user.role)
 

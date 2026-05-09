@@ -67,6 +67,14 @@ class EventLog(Base):
     created_at = Column(DateTime, nullable=False)
 
 
+class Season(Base):
+    __tablename__ = "seasons"
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    year       = Column(Integer, nullable=False)
+    month      = Column(Integer, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+
+
 class PointLog(Base):
     __tablename__ = "point_logs"
     id         = Column(Integer, primary_key=True, autoincrement=True)
@@ -86,6 +94,7 @@ class UserPoints(Base):
 def init_db():
     Base.metadata.create_all(engine)
     _migrate()
+    check_season_reset()
 
 
 def _migrate():
@@ -318,6 +327,45 @@ def set_user_plan(user_id, plan: str):
         if user:
             user.plan = plan
             session.commit()
+
+
+_RANKS = [
+    (45, "Diamond"),
+    (30, "Gold"),
+    (15, "Iron"),
+    (5,  "Flame"),
+    (0,  "Seed"),
+]
+
+
+def get_rank(season_points: int) -> dict:
+    for i, (threshold, name) in enumerate(_RANKS):
+        if season_points >= threshold:
+            if i == 0:
+                return {"name": name, "next": None, "progress": 100, "pts_to_next": 0}
+            next_threshold, next_name = _RANKS[i - 1]
+            pts_in_tier = season_points - threshold
+            tier_size   = next_threshold - threshold
+            progress    = round(pts_in_tier / tier_size * 100)
+            return {"name": name, "next": next_name,
+                    "progress": min(progress, 99),
+                    "pts_to_next": next_threshold - season_points}
+    return {"name": "Seed", "next": "Flame", "progress": 0, "pts_to_next": 5}
+
+
+def check_season_reset():
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST)
+    with Session(engine) as session:
+        latest = session.query(Season).order_by(Season.id.desc()).first()
+        if latest and latest.year == now.year and latest.month == now.month:
+            return  # 同じ月なのでリセット不要
+        session.add(Season(year=now.year, month=now.month,
+                           created_at=now.replace(tzinfo=None)))
+        # 初回以外はシーズンポイントをリセットする
+        if latest:
+            session.query(UserPoints).update({"season_points": 0})
+        session.commit()
 
 
 def _compute_streak_in_session(session, user_id, now):

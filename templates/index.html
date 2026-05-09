@@ -176,6 +176,23 @@
       color: #666;
       margin-top: 6px;
     }
+
+    .rank-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid;
+      vertical-align: middle;
+      margin-left: 6px;
+      letter-spacing: 0.5px;
+    }
+    .rank-seed    { color:#888;    background:#1a1a1a; border-color:#333; }
+    .rank-flame   { color:#ffa94d; background:#2a2010; border-color:#5a4010; }
+    .rank-iron    { color:#adb5bd; background:#212529; border-color:#495057; }
+    .rank-gold    { color:#ffd43b; background:#2a2200; border-color:#5a4a00; }
+    .rank-diamond { color:#74c0fc; background:#0a1a2a; border-color:#1a4a7a; }
   </style>
 </head>
 <body>
@@ -225,10 +242,12 @@
       </div>
     </div>
 
-    <!-- ポイントカード -->
+    <!-- ポイント・ランクカード -->
     <div class="card" style="margin-bottom:16px;">
-      <h2>ポイント</h2>
-      <div style="display:flex; gap:12px;">
+      <h2>ポイント
+        <span class="rank-badge rank-{{ rank.name|lower }}">{{ rank.name }}</span>
+      </h2>
+      <div style="display:flex; gap:12px; margin-bottom:14px;">
         <div style="flex:1; text-align:center;">
           <p style="font-size:0.75rem; color:#666; margin-bottom:6px;">シーズン</p>
           <p style="font-size:1.6rem; font-weight:700; letter-spacing:-0.5px; color:#4dabf7;">{{ points.season_points }}</p>
@@ -241,6 +260,18 @@
           <p style="font-size:0.72rem; color:#555; margin-top:2px;">pt</p>
         </div>
       </div>
+      {% if rank.next %}
+        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:#555; margin-bottom:5px;">
+          <span>{{ rank.name }}</span>
+          <span>{{ rank.next }} まで {{ rank.pts_to_next }}pt</span>
+        </div>
+        <div style="background:#252525; border-radius:4px; height:4px;">
+          <div style="height:4px; border-radius:4px; width:{{ rank.progress }}%;
+            background:{% if rank.next == 'Flame' %}#ffa94d{% elif rank.next == 'Iron' %}#adb5bd{% elif rank.next == 'Gold' %}#ffd43b{% else %}#74c0fc{% endif %};"></div>
+        </div>
+      {% else %}
+        <p style="font-size:0.72rem; color:#74c0fc; text-align:center;">最高ランク達成</p>
+      {% endif %}
     </div>
 
     <!-- ランキングカード -->
@@ -253,6 +284,7 @@
             <td style="padding:6px 0; color:#555; width:28px;">{{ loop.index }}</td>
             <td style="padding:6px 0; color:{% if r.username == current_user.username %}#4dabf7{% else %}#aaa{% endif %};">
               {{ r.username }}
+              <span class="rank-badge rank-{{ r.rank.name|lower }}">{{ r.rank.name }}</span>
             </td>
             <td style="padding:6px 0; color:#4dabf7; text-align:right; font-weight:600;">{{ r.season_points }} pt</td>
           </tr>
