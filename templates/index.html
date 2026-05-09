@@ -385,7 +385,8 @@
                     data-domains="{{ site.domains | join(',') }}"
                     onclick="togglePreset(this)">
               <img src="https://www.google.com/s2/favicons?domain={{ site.domains[0] }}&sz=32"
-                   width="20" height="20" style="border-radius:4px;" loading="lazy">
+                   width="20" height="20" style="border-radius:4px;" loading="lazy"
+                   onerror="this.src='https://icons.duckduckgo.com/ip3/{{ site.domains[0] }}.ico';this.onerror=null;">
               <span>{{ site.name }}</span>
             </button>
             {% endfor %}
