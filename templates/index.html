@@ -225,6 +225,44 @@
       </div>
     </div>
 
+    <!-- ポイントカード -->
+    <div class="card" style="margin-bottom:16px;">
+      <h2>ポイント</h2>
+      <div style="display:flex; gap:12px;">
+        <div style="flex:1; text-align:center;">
+          <p style="font-size:0.75rem; color:#666; margin-bottom:6px;">シーズン</p>
+          <p style="font-size:1.6rem; font-weight:700; letter-spacing:-0.5px; color:#4dabf7;">{{ points.season_points }}</p>
+          <p style="font-size:0.72rem; color:#555; margin-top:2px;">pt</p>
+        </div>
+        <div style="width:1px; background:#2a2a2a;"></div>
+        <div style="flex:1; text-align:center;">
+          <p style="font-size:0.75rem; color:#666; margin-bottom:6px;">通算</p>
+          <p style="font-size:1.6rem; font-weight:700; letter-spacing:-0.5px; color:#888;">{{ points.lifetime_points }}</p>
+          <p style="font-size:0.72rem; color:#555; margin-top:2px;">pt</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ランキングカード -->
+    <div class="card" style="margin-bottom:16px;">
+      <h2>シーズンランキング</h2>
+      {% if ranking %}
+        <table style="width:100%; font-size:0.82rem; border-collapse:collapse;">
+          {% for r in ranking %}
+          <tr style="border-bottom:1px solid #2a2a2a;">
+            <td style="padding:6px 0; color:#555; width:28px;">{{ loop.index }}</td>
+            <td style="padding:6px 0; color:{% if r.username == current_user.username %}#4dabf7{% else %}#aaa{% endif %};">
+              {{ r.username }}
+            </td>
+            <td style="padding:6px 0; color:#4dabf7; text-align:right; font-weight:600;">{{ r.season_points }} pt</td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% else %}
+        <p style="font-size:0.82rem; color:#555;">データなし</p>
+      {% endif %}
+    </div>
+
     <div class="status">
       {% if config.emergency_unblock %}
         <span class="dot" style="background:#ffa94d; box-shadow:0 0 6px #ffa94d;"></span>

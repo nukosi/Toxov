@@ -67,6 +67,22 @@ class EventLog(Base):
     created_at = Column(DateTime, nullable=False)
 
 
+class PointLog(Base):
+    __tablename__ = "point_logs"
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    amount     = Column(Integer, nullable=False)
+    reason     = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+
+
+class UserPoints(Base):
+    __tablename__ = "user_points"
+    user_id         = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    season_points   = Column(Integer, nullable=False, default=0)
+    lifetime_points = Column(Integer, nullable=False, default=0)
+
+
 def init_db():
     Base.metadata.create_all(engine)
     _migrate()
@@ -122,6 +138,18 @@ def _migrate():
             if "version" not in config_columns:
                 conn.execute(text("ALTER TABLE config ADD COLUMN version INTEGER DEFAULT 0"))
                 conn.commit()
+        # 既存ユーザーの user_points エントリが未作成なら初期化する
+        users = conn.execute(text("SELECT id FROM users")).fetchall()
+        for (uid,) in users:
+            exists = conn.execute(
+                text("SELECT user_id FROM user_points WHERE user_id=:uid"), {"uid": uid}
+            ).fetchone()
+            if not exists:
+                conn.execute(
+                    text("INSERT INTO user_points (user_id, season_points, lifetime_points) VALUES (:uid, 0, 0)"),
+                    {"uid": uid}
+                )
+        conn.commit()
         # sites テーブルに user_id がなければ追加
         if "sites" in inspector.get_table_names():
             site_columns = [c["name"] for c in inspector.get_columns("sites")]
@@ -152,6 +180,7 @@ def create_user(username, password):
             session.add(user)
             session.flush()
             session.add(Config(user_id=user.id, block_start="08:00", block_end="21:00"))
+            session.add(UserPoints(user_id=user.id, season_points=0, lifetime_points=0))
         session.commit()
 
 
@@ -289,6 +318,91 @@ def set_user_plan(user_id, plan: str):
         if user:
             user.plan = plan
             session.commit()
+
+
+def _compute_streak_in_session(session, user_id, now):
+    last_emergency = (
+        session.query(EventLog)
+        .filter_by(user_id=user_id, event="emergency_unblock")
+        .order_by(EventLog.id.desc())
+        .first()
+    )
+    if last_emergency:
+        return max(0, (now - last_emergency.created_at).days)
+    first_block = (
+        session.query(EventLog)
+        .filter_by(user_id=user_id, event="block_start")
+        .order_by(EventLog.id.asc())
+        .first()
+    )
+    return (now - first_block.created_at).days if first_block else 0
+
+
+def _record_point(session, pts, user_id, amount, reason, now, affect_lifetime):
+    pts.season_points = max(0, pts.season_points + amount)
+    if affect_lifetime and amount > 0:
+        pts.lifetime_points += amount
+    session.add(PointLog(user_id=user_id, amount=amount, reason=reason, created_at=now))
+
+
+def apply_event_points(user_id: int, event: str):
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    with Session(engine) as session:
+        pts = session.get(UserPoints, user_id)
+        if not pts:
+            pts = UserPoints(user_id=user_id, season_points=0, lifetime_points=0)
+            session.add(pts)
+
+        if event == "block_end":
+            # 直近のblock_start以降にemergency_unblockがあれば失敗セッション
+            last_start = (
+                session.query(EventLog)
+                .filter_by(user_id=user_id, event="block_start")
+                .order_by(EventLog.id.desc())
+                .first()
+            )
+            had_emergency = last_start and session.query(EventLog).filter(
+                EventLog.user_id == user_id,
+                EventLog.event == "emergency_unblock",
+                EventLog.created_at > last_start.created_at,
+            ).first() is not None
+
+            if not had_emergency:
+                _record_point(session, pts, user_id, 1, "daily_completion", now, affect_lifetime=True)
+                streak = _compute_streak_in_session(session, user_id, now)
+                if streak > 0 and streak % 30 == 0:
+                    _record_point(session, pts, user_id, 10, f"streak_{streak}", now, affect_lifetime=True)
+                elif streak > 0 and streak % 7 == 0:
+                    _record_point(session, pts, user_id, 3, f"streak_{streak}", now, affect_lifetime=True)
+
+        elif event == "emergency_unblock":
+            # シーズンポイントのみ -6pt（0未満にしない）
+            deduct = min(6, pts.season_points)
+            if deduct > 0:
+                _record_point(session, pts, user_id, -deduct, "emergency_unblock", now, affect_lifetime=False)
+
+        session.commit()
+
+
+def get_user_points(user_id) -> dict:
+    with Session(engine) as session:
+        pts = session.get(UserPoints, user_id)
+        if not pts:
+            return {"season_points": 0, "lifetime_points": 0}
+        return {"season_points": pts.season_points, "lifetime_points": pts.lifetime_points}
+
+
+def get_season_ranking(limit=10) -> list:
+    with Session(engine) as session:
+        rows = (
+            session.query(UserModel.username, UserPoints.season_points, UserPoints.lifetime_points)
+            .join(UserPoints, UserModel.id == UserPoints.user_id)
+            .order_by(UserPoints.season_points.desc())
+            .limit(limit)
+            .all()
+        )
+        return [{"username": r[0], "season_points": r[1], "lifetime_points": r[2]} for r in rows]
 
 
 def save_config(user_id, block_start, block_end, sites, apps=None):
