@@ -9,7 +9,7 @@ import winreg
 import threading
 import requests
 import tkinter as tk
-from tkinter import simpledialog, messagebox, filedialog
+from tkinter import simpledialog, messagebox
 import pystray
 from PIL import Image, ImageDraw
 from comments import get_comment
@@ -238,19 +238,26 @@ def setup_tray(add_url: str, log) -> pystray.Icon:
         return "起動中..."
 
     def add_app(icon, item):
-        # tkinterのファイルダイアログでexeを選択してサーバーに送信する
-        root = tk.Tk()
-        root.withdraw()
-        root.wm_attributes("-topmost", True)
-        path = filedialog.askopenfilename(
-            parent=root,
-            title="ブロックするアプリを選択",
-            filetypes=[("実行ファイル", "*.exe"), ("すべてのファイル", "*.*")],
+        # pystrayのコールバックはメインスレッドではないためtkinterが使えない
+        # PowerShellのOpenFileDialogを subprocess で呼ぶことでスレッドセーフにする
+        # Steamのcommonフォルダがあればそこを、なければCドライブルートを初期ディレクトリにする
+        steam_common = r"C:\Program Files (x86)\Steam\steamapps\common"
+        init_dir = steam_common if os.path.isdir(steam_common) else "C:\\"
+        ps = (
+            "Add-Type -AssemblyName System.Windows.Forms;"
+            "$d = New-Object System.Windows.Forms.OpenFileDialog;"
+            "$d.Title = 'ブロックするアプリを選択';"
+            "$d.Filter = '実行ファイル (*.exe)|*.exe|すべてのファイル (*.*)|*.*';"
+            f"$d.InitialDirectory = '{init_dir}';"
+            "if ($d.ShowDialog() -eq 'OK') { $d.FileName }"
         )
-        root.destroy()
+        result = subprocess.run(
+            ["powershell", "-WindowStyle", "Hidden", "-Command", ps],
+            capture_output=True, text=True, timeout=60,
+        )
+        path = result.stdout.strip()
         if not path:
             return
-        path = os.path.normpath(path)
         try:
             res = requests.post(add_url, json={"path": path}, timeout=5)
             if res.ok:
@@ -371,9 +378,14 @@ def main():
             current_state, last_version, events = apply_config(
                 config, current_state, last_version, log
             )
-            # ブロック状態をトレイアイコンに反映する
+            # ブロック状態をトレイアイコンとメニューテキストに反映する
             _tray_state["blocking"] = current_state
             tray.icon = make_icon(current_state is True)
+            # pystrayのWindowsバックエンドはメニューテキストを自動更新しないため明示的に更新する
+            try:
+                tray.update_menu()
+            except Exception:
+                pass
             for event in events:
                 if event == "block_start":
                     notify(f"ブロック開始  {get_comment('block_start')}")
