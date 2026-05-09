@@ -29,6 +29,8 @@ class UserModel(Base):
     plan         = Column(String, nullable=False, default="free")
     role         = Column(String, nullable=False, default="user")
     connect_code = Column(String, nullable=True, unique=True)
+    # パスワードリセット用。登録時は任意
+    email        = Column(String, nullable=True, unique=True)
     config    = relationship("Config", back_populates="user", uselist=False, cascade="all, delete-orphan")
     sites     = relationship("Site", back_populates="user", cascade="all, delete-orphan")
     apps      = relationship("App",  back_populates="user", cascade="all, delete-orphan")
@@ -93,6 +95,16 @@ class UserPoints(Base):
     lifetime_points = Column(Integer, nullable=False, default=0)
 
 
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token      = Column(String, nullable=False, unique=True)
+    expires_at = Column(DateTime, nullable=False)
+    # 使用済みフラグ。消去する代わりにマークするだけで履歴を保持する
+    used       = Column(Boolean, nullable=False, default=False)
+
+
 def init_db():
     Base.metadata.create_all(engine)
     _migrate()
@@ -114,6 +126,10 @@ def _migrate():
                 token = secrets.token_urlsafe(32)
                 conn.execute(text("UPDATE users SET api_token=:t WHERE id=:id"),
                              {"t": token, "id": uid})
+            conn.commit()
+        # users テーブルに email がなければ追加（パスワードリセット用、任意）
+        if "email" not in user_columns:
+            conn.execute(text("ALTER TABLE users ADD COLUMN email TEXT"))
             conn.commit()
         # users テーブルに plan がなければ追加（デフォルト free）
         if "plan" not in user_columns:
@@ -181,7 +197,7 @@ def _migrate():
                 conn.commit()
 
 
-def create_user(username, password):
+def create_user(username, password, email=None):
     token = secrets.token_urlsafe(32)
     with Session(engine) as session:
         user = session.query(UserModel).filter_by(username=username).first()
@@ -197,6 +213,7 @@ def create_user(username, password):
                 plan="free",
                 role="admin" if is_first else "user",
                 connect_code=_generate_connect_code(),
+                email=email.lower().strip() if email else None,
             )
             session.add(user)
             session.flush()
@@ -210,7 +227,7 @@ def get_user_by_id(user_id):
         user = session.get(UserModel, user_id)
         return {"id": user.id, "username": user.username, "api_token": user.api_token,
                 "plan": user.plan or "free", "role": user.role or "user",
-                "connect_code": user.connect_code} if user else None
+                "connect_code": user.connect_code, "email": user.email} if user else None
 
 
 def get_user_by_token(token):
@@ -353,6 +370,72 @@ def get_user_by_connect_code(code: str):
     with Session(engine) as session:
         user = session.query(UserModel).filter_by(connect_code=code.upper()).first()
         return {"id": user.id, "api_token": user.api_token} if user else None
+
+
+def get_user_by_email(email: str):
+    # メールアドレスからユーザーを検索する（パスワードリセット用）
+    with Session(engine) as session:
+        user = session.query(UserModel).filter_by(email=email.lower().strip()).first()
+        return {"id": user.id, "username": user.username, "email": user.email} if user else None
+
+
+def set_user_email(user_id: int, email: str):
+    # プロフィールページからメールアドレスを登録・更新する
+    with Session(engine) as session:
+        user = session.get(UserModel, user_id)
+        if user:
+            user.email = email.lower().strip()
+            session.commit()
+
+
+def create_reset_token(user_id: int) -> str:
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.datetime.now(JST).replace(tzinfo=None) + datetime.timedelta(hours=1)
+    with Session(engine) as session:
+        # 既存の未使用トークンをすべて無効化してから新規発行する（1ユーザー1トークン）
+        session.query(PasswordResetToken).filter_by(user_id=user_id, used=False).update({"used": True})
+        session.add(PasswordResetToken(
+            user_id=user_id,
+            token=token,
+            expires_at=expires_at,
+            used=False,
+        ))
+        session.commit()
+    return token
+
+
+def verify_reset_token(token: str):
+    """トークンが有効かどうかを確認する。有効なら user_id を含む dict を返す。"""
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    with Session(engine) as session:
+        t = session.query(PasswordResetToken).filter_by(token=token, used=False).first()
+        if not t or t.expires_at < now:
+            return None
+        return {"user_id": t.user_id}
+
+
+def consume_reset_token(token: str):
+    """トークンを使用済みにしてuser_idを返す。無効なら None を返す。"""
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    with Session(engine) as session:
+        t = session.query(PasswordResetToken).filter_by(token=token, used=False).first()
+        if not t or t.expires_at < now:
+            return None
+        t.used = True
+        user_id = t.user_id
+        session.commit()
+    return user_id
+
+
+def update_password(user_id: int, new_password: str):
+    with Session(engine) as session:
+        user = session.get(UserModel, user_id)
+        if user:
+            user.password = generate_password_hash(new_password)
+            session.commit()
 
 
 _RANKS = [

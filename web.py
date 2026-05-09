@@ -7,9 +7,11 @@ from database import (init_db, load_config, save_config,
                       set_emergency_unblock, add_event_log, get_event_logs, get_streak,
                       set_user_plan, has_emergency_history, get_success_rate,
                       apply_event_points, get_user_points, get_season_ranking, get_rank,
-                      get_user_by_connect_code)
+                      get_user_by_connect_code, get_user_by_email, set_user_email,
+                      create_reset_token, verify_reset_token, consume_reset_token, update_password)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
+from mailer import send_password_reset
 
 PRESET_SITES = [
     {
@@ -98,14 +100,18 @@ def register():
     if request.method == "POST":
         username = request.form["username"].strip()
         password = request.form["password"].strip()
+        # メールアドレスは任意。空文字はNoneとして扱う
+        email    = request.form.get("email", "").strip() or None
         if username and password:
             from database import Session, engine, UserModel
             with Session(engine) as session:
                 exists = session.query(UserModel).filter_by(username=username).first()
             if exists:
                 error = "そのユーザー名はすでに使われています"
+            elif email and get_user_by_email(email):
+                error = "そのメールアドレスはすでに使われています"
             else:
-                create_user(username, password)
+                create_user(username, password, email)
                 return redirect(url_for("login"))
         else:
             error = "ユーザー名とパスワードを入力してください"
@@ -257,6 +263,61 @@ def api_log(token):
         add_event_log(user["id"], event)
         apply_event_points(user["id"], event)
     return jsonify({"ok": True})
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        user = get_user_by_email(email) if email else None
+        # セキュリティのため、メールが存在しない場合も「送信した」と表示する
+        if user:
+            token     = create_reset_token(user["id"])
+            reset_url = url_for("reset_password", token=token, _external=True)
+            send_password_reset(email, reset_url)
+        return render_template("forgot_password.html", sent=True)
+    return render_template("forgot_password.html", sent=False)
+
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    # リンクを開いた時点でトークンの有効性を確認する
+    valid = verify_reset_token(token)
+    if not valid:
+        return render_template("reset_password.html", error="このリンクは無効か期限切れです", token=token, expired=True)
+    if request.method == "POST":
+        password = request.form.get("password", "").strip()
+        if len(password) < 6:
+            return render_template("reset_password.html", error="パスワードは6文字以上で入力してください", token=token, expired=False)
+        # POSTの直前に再度確認してからトークンを消費する（二重送信対策）
+        user_id = consume_reset_token(token)
+        if not user_id:
+            return render_template("reset_password.html", error="このリンクは無効か期限切れです", token=token, expired=True)
+        update_password(user_id, password)
+        return redirect(url_for("login"))
+    return render_template("reset_password.html", error=None, token=token, expired=False)
+
+
+@app.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    message = None
+    error   = None
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        if not email:
+            error = "メールアドレスを入力してください"
+        elif "@" not in email or "." not in email.split("@")[-1]:
+            error = "有効なメールアドレスを入力してください"
+        else:
+            existing = get_user_by_email(email)
+            if existing and existing["id"] != current_user.id:
+                error = "そのメールアドレスはすでに使われています"
+            else:
+                set_user_email(current_user.id, email)
+                message = "メールアドレスを保存しました"
+    data = get_user_by_id(current_user.id)
+    return render_template("profile.html", email=data.get("email"), message=message, error=error)
 
 
 @app.route("/download")
