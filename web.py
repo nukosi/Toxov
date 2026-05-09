@@ -11,6 +11,40 @@ from database import (init_db, load_config, save_config,
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 
+PRESET_SITES = [
+    {
+        "category": "動画",
+        "collapsed": False,
+        "sites": [
+            {"name": "YouTube",  "domains": ["youtube.com", "www.youtube.com", "youtu.be"]},
+            {"name": "Netflix",  "domains": ["netflix.com"]},
+            {"name": "Twitch",   "domains": ["twitch.tv"]},
+            {"name": "ニコニコ", "domains": ["nicovideo.jp"]},
+        ],
+    },
+    {
+        "category": "SNS",
+        "collapsed": False,
+        "sites": [
+            {"name": "X",          "domains": ["x.com", "twitter.com"]},
+            {"name": "Instagram",  "domains": ["instagram.com"]},
+            {"name": "TikTok",     "domains": ["tiktok.com"]},
+            {"name": "Reddit",     "domains": ["reddit.com"]},
+            {"name": "Facebook",   "domains": ["facebook.com"]},
+            {"name": "Discord",    "domains": ["discord.com"]},
+        ],
+    },
+    {
+        "category": "成人向け",
+        "collapsed": True,
+        "sites": [
+            {"name": "Pornhub", "domains": ["pornhub.com"]},
+            {"name": "xVideos", "domains": ["xvideos.com"]},
+            {"name": "xHamster","domains": ["xhamster.com"]},
+        ],
+    },
+]
+
 app = Flask(__name__)
 # 本番環境では環境変数 SECRET_KEY に強いランダム文字列を設定すること
 app.secret_key = os.environ.get("SECRET_KEY", "nukosisnsblocker-secret-key-change-this-later")
@@ -128,7 +162,7 @@ def index():
                            weekly_rate=weekly_rate, monthly_rate=monthly_rate,
                            points=points, rank=rank, ranking=ranking, error=error,
                            plan=current_user.plan, limits=limits,
-                           role=current_user.role)
+                           role=current_user.role, presets=PRESET_SITES)
 
 
 @app.route("/save", methods=["POST"])

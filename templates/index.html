@@ -193,6 +193,36 @@
     .rank-iron    { color:#adb5bd; background:#212529; border-color:#495057; }
     .rank-gold    { color:#ffd43b; background:#2a2200; border-color:#5a4a00; }
     .rank-diamond { color:#74c0fc; background:#0a1a2a; border-color:#1a4a7a; }
+
+    .preset-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      padding: 10px 12px;
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 10px;
+      cursor: pointer;
+      color: #666;
+      font-size: 0.72rem;
+      min-width: 64px;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .preset-btn:hover { border-color: #555; color: #aaa; }
+    .preset-btn.active { background: #1e3a2a; border-color: #2d5a3d; color: #69db7c; }
+    .preset-btn.active:hover { border-color: #3d7a4d; }
+
+    .preset-category {
+      font-size: 0.7rem;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
   </style>
 </head>
 <body>
@@ -344,7 +374,48 @@
             {% if plan == 'premium' %}Premium{% else %}{{ config.sites | length }}/{{ limits.max_sites }}{% endif %}
           </span>
         </h2>
-        <textarea name="sites">{{ config.sites | join('\n') }}</textarea>
+
+        <!-- プリセットカード -->
+        {% for cat in presets %}
+          {% if not cat.collapsed %}
+          <p class="preset-category">{{ cat.category }}</p>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
+            {% for site in cat.sites %}
+            <button type="button" class="preset-btn"
+                    data-domains="{{ site.domains | join(',') }}"
+                    onclick="togglePreset(this)">
+              <img src="https://www.google.com/s2/favicons?domain={{ site.domains[0] }}&sz=32"
+                   width="20" height="20" style="border-radius:4px;" loading="lazy">
+              <span>{{ site.name }}</span>
+            </button>
+            {% endfor %}
+          </div>
+          {% endif %}
+        {% endfor %}
+
+        <!-- 成人向け（折りたたみ） -->
+        <details>
+          <summary style="font-size:0.75rem; color:#444; cursor:pointer; margin-bottom:8px; user-select:none;">
+            ▸ 成人向け
+          </summary>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; margin-bottom:12px;">
+            {% for cat in presets %}
+              {% if cat.collapsed %}
+                {% for site in cat.sites %}
+                <button type="button" class="preset-btn"
+                        data-domains="{{ site.domains | join(',') }}"
+                        onclick="togglePreset(this)">
+                  <img src="https://www.google.com/s2/favicons?domain={{ site.domains[0] }}&sz=32"
+                       width="20" height="20" style="border-radius:4px;" loading="lazy">
+                  <span>{{ site.name }}</span>
+                </button>
+                {% endfor %}
+              {% endif %}
+            {% endfor %}
+          </div>
+        </details>
+
+        <textarea id="sites-textarea" name="sites">{{ config.sites | join('\n') }}</textarea>
         <p class="hint">1行に1サイト。例: instagram.com</p>
         {% if blocking %}
         <p class="lock-notice">ブロック時間中は削除できません（追加のみ可能）</p>
@@ -460,5 +531,42 @@
     </div>
     {% endif %}
   </div>
+  <script>
+    const BLOCKING = {{ 'true' if blocking else 'false' }};
+
+    function getTextareaDomains() {
+      return document.getElementById('sites-textarea').value
+        .split('\n').map(s => s.trim()).filter(s => s);
+    }
+
+    function setTextareaDomains(domains) {
+      document.getElementById('sites-textarea').value = domains.join('\n');
+    }
+
+    function togglePreset(btn) {
+      const domains = btn.dataset.domains.split(',');
+      const current = getTextareaDomains();
+      const allPresent = domains.every(d => current.includes(d));
+
+      if (allPresent) {
+        if (BLOCKING) return; // ブロック中は削除不可
+        setTextareaDomains(current.filter(d => !domains.includes(d)));
+      } else {
+        const toAdd = domains.filter(d => !current.includes(d));
+        setTextareaDomains([...current, ...toAdd]);
+      }
+      updatePresetStates();
+    }
+
+    function updatePresetStates() {
+      const current = getTextareaDomains();
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        const domains = btn.dataset.domains.split(',');
+        btn.classList.toggle('active', domains.every(d => current.includes(d)));
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', updatePresetStates);
+  </script>
 </body>
 </html>
