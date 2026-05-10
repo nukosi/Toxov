@@ -246,32 +246,35 @@ details > summary::-webkit-details-marker { display: none; }
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <!-- ブロック時間 -->
-    <div class="card">
-      <div class="card-label">ブロック時間</div>
-      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-        <label style="font-size:.84rem; color:var(--muted); margin:0;">開始</label>
+    <div class="card" style="text-align:center; padding:28px 24px;">
+      <div style="font-size:.78rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted); font-weight:600; margin-bottom:18px;">ブロック時間</div>
+      <div style="display:inline-flex; align-items:center; gap:14px; flex-wrap:wrap; justify-content:center;">
+        <label style="font-size:1rem; color:var(--muted); margin:0;">開始</label>
         <input type="time" name="block_start" value="{{ config.block_start }}"
-               {% if blocking %}readonly{% endif %} required>
-        <label style="font-size:.84rem; color:var(--muted); margin:0;">終了</label>
+               {% if blocking %}readonly{% endif %} required
+               style="font-size:1.5rem; padding:10px 14px; letter-spacing:1px;">
+        <span style="font-size:1.2rem; color:var(--dim);">〜</span>
+        <label style="font-size:1rem; color:var(--muted); margin:0;">終了</label>
         <input type="time" name="block_end" value="{{ config.block_end }}"
-               {% if blocking %}readonly{% endif %} required>
+               {% if blocking %}readonly{% endif %} required
+               style="font-size:1.5rem; padding:10px 14px; letter-spacing:1px;">
       </div>
-      {% if blocking %}<p class="lock-note">ブロック時間中は変更できません</p>{% endif %}
+      {% if blocking %}<p class="lock-note" style="margin-top:12px;">ブロック時間中は変更できません</p>{% endif %}
     </div>
 
     <!-- サイト -->
-    <div class="card">
-      <div class="card-label">
+    <div class="card" style="text-align:center;">
+      <div style="font-size:.78rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted); font-weight:600; margin-bottom:4px;">
         ブロックするサイト
-        <span style="font-size:.7rem; font-weight:400; color:var(--dim); margin-left:4px;">
-          {% if plan == 'premium' %}Premium{% else %}{{ config.sites|length }}/{{ limits.max_sites }}{% endif %}
-        </span>
+      </div>
+      <div style="font-size:.78rem; color:var(--muted); margin-bottom:16px;">
+        {% if plan == 'premium' %}Premium{% else %}{{ config.sites|length }} / {{ limits.max_sites }}{% endif %}
       </div>
 
       {% for cat in presets %}
         {% if not cat.collapsed %}
-          <p style="font-size:.62rem; text-transform:uppercase; letter-spacing:1px; color:var(--dim); margin-bottom:7px;">{{ cat.category }}</p>
-          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">
+          <p style="font-size:.72rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:8px;">{{ cat.category }}</p>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; justify-content:center;">
             {% for site in cat.sites %}
             <button type="button" class="preset-btn" data-domains="{{ site.domains|join(',') }}" onclick="togglePreset(this)">
               <img src="https://www.google.com/s2/favicons?domain={{ site.domains[0] }}&sz=32"
@@ -284,9 +287,9 @@ details > summary::-webkit-details-marker { display: none; }
         {% endif %}
       {% endfor %}
 
-      <details>
-        <summary style="font-size:.74rem; color:var(--dim); cursor:pointer; margin-bottom:8px; user-select:none;">▸ 成人向け</summary>
-        <div style="display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 14px;">
+      <details style="text-align:left;">
+        <summary style="font-size:.78rem; color:var(--muted); cursor:pointer; margin-bottom:8px; user-select:none; text-align:center;">▸ 成人向け</summary>
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 14px; justify-content:center;">
           {% for cat in presets %}{% if cat.collapsed %}{% for site in cat.sites %}
           <button type="button" class="preset-btn" data-domains="{{ site.domains|join(',') }}" onclick="togglePreset(this)">
             <img src="https://www.google.com/s2/favicons?domain={{ site.domains[0] }}&sz=32"
@@ -297,8 +300,8 @@ details > summary::-webkit-details-marker { display: none; }
         </div>
       </details>
 
-      <textarea id="sites-ta" name="sites" style="height:120px;">{{ config.sites|join('\n') }}</textarea>
-      <p class="hint">1行に1サイト（例: instagram.com）</p>
+      <textarea id="sites-ta" name="sites" style="height:120px; text-align:left;">{{ config.sites|join('\n') }}</textarea>
+      <p class="hint" style="color:var(--muted);">1行に1サイト（例: instagram.com）</p>
       {% if blocking %}<p class="lock-note">ブロック時間中は削除できません（追加のみ可）</p>{% endif %}
     </div>
 
@@ -306,16 +309,18 @@ details > summary::-webkit-details-marker { display: none; }
     <div class="card">
       <div class="card-label">
         ブロックするアプリ
-        <span style="font-size:.7rem; font-weight:400; color:var(--dim); margin-left:4px;">
+        <span style="font-size:.7rem; font-weight:400; color:var(--muted); margin-left:4px;">
           {% if plan == 'premium' %}Premium{% else %}{{ config.apps|length }}/{{ limits.max_apps }}{% endif %}
         </span>
       </div>
       <textarea name="apps" style="height:100px;">{{ config.apps|join('\n') }}</textarea>
-      <p class="hint">1行に1つ、実行ファイルのフルパス（例: C:\...\game.exe）</p>
+      <p class="hint" style="color:var(--muted);">1行に1つ、実行ファイルのフルパス（例: C:\...\game.exe）</p>
       {% if blocking %}<p class="lock-note">ブロック時間中は削除できません（追加のみ可）</p>{% endif %}
     </div>
 
-    <button type="submit" class="btn btn-primary btn-full">設定を保存</button>
+    <div style="text-align:center; margin-top:4px;">
+      <button type="submit" class="btn btn-primary">設定を保存</button>
+    </div>
   </form>
 
 </div><!-- /tab-settings -->
