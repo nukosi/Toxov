@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Toxov{% endblock %}</title>
+  <style>
+    :root {
+      --bg:        #0d0d0d;
+      --bg-card:   #141414;
+      --bg-input:  #1c1c1c;
+      --bg-hover:  #1f1f1f;
+      --border:    #242424;
+      --text:      #e4e4e4;
+      --muted:     #767676;
+      --dim:       #3e3e3e;
+      --accent:    #4dabf7;
+      --success:   #51cf66;
+      --warning:   #ffa94d;
+      --danger:    #ff6b6b;
+      --sw:        218px;
+      --r:         10px;
+      --rs:        7px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ─── Sidebar ─── */
+    .sb {
+      width: var(--sw);
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+
+    .sb-brand {
+      padding: 18px 16px;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -.3px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .sb-nav {
+      flex: 1;
+      padding: 8px;
+      overflow-y: auto;
+    }
+
+    .sb-grp {
+      font-size: .62rem;
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      color: var(--dim);
+      padding: 14px 8px 4px;
+      font-weight: 600;
+    }
+
+    .sb-link {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 9px;
+      border-radius: var(--rs);
+      color: var(--muted);
+      text-decoration: none;
+      font-size: .84rem;
+      font-weight: 500;
+      transition: background .12s, color .12s;
+      cursor: pointer;
+    }
+
+    .sb-link:hover { background: var(--bg-hover); color: var(--text); }
+    .sb-link.active { background: var(--bg-hover); color: var(--text); }
+    .sb-link svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+    .sb-foot {
+      padding: 8px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    /* Status pill */
+    .sb-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 9px;
+      font-size: .8rem;
+      font-weight: 500;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-block   { background: var(--danger);  box-shadow: 0 0 5px var(--danger); }
+    .dot-free    { background: var(--success); box-shadow: 0 0 5px var(--success); }
+    .dot-emerg   { background: var(--warning); box-shadow: 0 0 5px var(--warning); }
+
+    /* ─── Main ─── */
+    .main {
+      margin-left: var(--sw);
+      flex: 1;
+      padding: 28px 32px;
+    }
+
+    .wrap { max-width: 580px; }
+
+    /* ─── Cards ─── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 18px 20px;
+      margin-bottom: 10px;
+    }
+
+    .card-label {
+      font-size: .67rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+
+    /* ─── Section titles ─── */
+    .sec {
+      font-size: .67rem;
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      color: var(--dim);
+      font-weight: 600;
+      margin: 30px 0 10px;
+      scroll-margin-top: 20px;
+    }
+
+    /* ─── Inputs ─── */
+    input[type=text], input[type=password], input[type=email], input[type=time], textarea {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--rs);
+      color: var(--text);
+      font-size: .88rem;
+      padding: 8px 11px;
+      outline: none;
+      transition: border-color .15s;
+      font-family: inherit;
+    }
+    input[type=text]:focus, input[type=password]:focus,
+    input[type=email]:focus, input[type=time]:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+    input[type=time] { width: auto; }
+    input[readonly]  { opacity: .4; cursor: not-allowed; }
+    textarea {
+      width: 100%;
+      resize: vertical;
+      line-height: 1.7;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: .82rem;
+    }
+
+    /* ─── Buttons ─── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: var(--rs);
+      border: none;
+      font-size: .84rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+      font-family: inherit;
+      line-height: 1;
+    }
+    .btn:hover { opacity: .82; }
+    .btn-primary { background: var(--accent);  color: #000; }
+    .btn-danger  { background: var(--danger);  color: #fff; }
+    .btn-success { background: var(--success); color: #000; }
+    .btn-ghost   {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: #333; }
+    .btn-full    { width: 100%; padding: 11px 16px; }
+
+    /* ─── Banners ─── */
+    .banner { border-radius: var(--rs); padding: 9px 13px; margin-bottom: 10px; font-size: .84rem; }
+    .banner-ok   { background: #0d2018; border: 1px solid #1c3d28; color: var(--success); }
+    .banner-err  { background: #200d0d; border: 1px solid #3d1c1c; color: var(--danger); }
+    .banner-warn { background: #1e1400; border: 1px solid #382600; color: var(--warning); }
+
+    /* ─── Misc ─── */
+    .hint      { font-size: .74rem; color: var(--dim);     margin-top: 5px; }
+    .lock-note { font-size: .74rem; color: var(--warning); margin-top: 6px; }
+    .divider   { height: 1px; background: var(--border); margin: 4px 0 8px; }
+
+    /* ─── Rank badges ─── */
+    .badge {
+      display: inline-block;
+      font-size: .62rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid;
+      letter-spacing: .4px;
+      vertical-align: middle;
+    }
+    .rank-seed    { color:#888;    background:#141414; border-color:#2a2a2a; }
+    .rank-flame   { color:#ffa94d; background:#1e1500; border-color:#4a3400; }
+    .rank-iron    { color:#adb5bd; background:#141414; border-color:#3a3d40; }
+    .rank-gold    { color:#ffd43b; background:#1a1500; border-color:#4a3f00; }
+    .rank-diamond { color:#74c0fc; background:#091422; border-color:#143060; }
+
+    {% block extra_style %}{% endblock %}
+  </style>
+</head>
+<body>
+  <aside class="sb">
+    <div class="sb-brand">Toxov</div>
+    <nav class="sb-nav">
+      {% block sidebar %}{% endblock %}
+    </nav>
+    <div class="sb-foot">
+      {% block sidebar_foot %}{% endblock %}
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="wrap">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

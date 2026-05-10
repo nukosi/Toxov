@@ -17,6 +17,10 @@ from comments import get_comment
 # ドメイン取得時はここだけ変える
 SERVER_BASE = "https://web-production-ed8c9.up.railway.app"
 
+# サーバー側の AGENT_SECRET 環境変数と同じ値を設定すること
+# 配布前に必ずRailwayで AGENT_SECRET を設定し、この値を合わせてビルドし直す
+AGENT_SECRET = "toxov-prod-abc123xyz"
+
 CONFIG_DIR  = os.path.join(os.environ["APPDATA"], "Toxov")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 HOSTS_FILE  = r"C:\Windows\System32\drivers\etc\hosts"
@@ -24,6 +28,9 @@ HOSTS_FILE  = r"C:\Windows\System32\drivers\etc\hosts"
 BLOCK_TAG   = "# Toxov"
 JST         = datetime.timezone(datetime.timedelta(hours=9))
 POLL_INTERVAL = 30  # seconds
+
+# 全APIリクエストに付与する認証ヘッダー
+_API_HEADERS = {"X-Toxov-Key": AGENT_SECRET}
 
 
 def is_admin():
@@ -54,7 +61,10 @@ def ensure_single_instance():
 def resolve_connect_code(code: str) -> str | None:
     # 6文字の接続コードをサーバーに送ってconfig URLを取得する
     try:
-        res = requests.get(f"{SERVER_BASE}/api/connect/{code.strip().upper()}", timeout=10)
+        res = requests.get(
+            f"{SERVER_BASE}/api/connect/{code.strip().upper()}",
+            headers=_API_HEADERS, timeout=10,
+        )
         if res.status_code == 200:
             return res.json().get("config_url")
     except Exception:
@@ -329,7 +339,8 @@ if ($form.ShowDialog() -eq 'OK' -and $lv.SelectedItems.Count -gt 0) {
         if not path:
             return
         try:
-            res = requests.post(add_url, json={"path": path}, timeout=5)
+            res = requests.post(add_url, json={"path": path},
+                                headers=_API_HEADERS, timeout=5)
             if res.ok:
                 notify(f"追加: {os.path.basename(path)}")
             else:
@@ -359,7 +370,7 @@ def config_stream(url, log):
     """
     while True:
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, headers=_API_HEADERS, timeout=10)
             response.raise_for_status()
             yield response.json()
         except Exception as e:
@@ -432,7 +443,9 @@ def main():
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(f"[{now}] {msg}\n")
 
-    log(f"起動 URL={cloud_url}")
+    # ログにはトークン末尾8文字のみ記録してフルトークンの漏洩を防ぐ
+    masked_url = cloud_url[:-8] + "..." + cloud_url[-4:] if len(cloud_url) > 12 else "***"
+    log(f"起動 URL={masked_url}")
 
     # config URLからlog・アプリ追加のURLを導出する（トークンは共通）
     log_url = cloud_url.replace("/api/config/", "/api/log/")
@@ -462,7 +475,8 @@ def main():
                 elif event == "block_end":
                     notify(f"ブロック終了  {get_comment('block_end')}")
                 try:
-                    requests.post(log_url, json={"event": event}, timeout=5)
+                    requests.post(log_url, json={"event": event},
+                                  headers=_API_HEADERS, timeout=5)
                 except Exception:
                     pass
 

@@ -1,5 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect
+from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 import datetime
 from database import (init_db, load_config, save_config,
@@ -52,14 +56,47 @@ app = Flask(__name__)
 # 本番環境では環境変数 SECRET_KEY に強いランダム文字列を設定すること
 app.secret_key = os.environ.get("SECRET_KEY", "nukosisnsblocker-secret-key-change-this-later")
 
+# Railway等のリバースプロキシ配下でX-Forwarded-Protoを正しく解釈させる
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# RailwayサーバーはHTTPS必須。RAILWAY_SERVICE_NAMEで本番環境を検出する
+_IS_PRODUCTION = bool(os.environ.get("RAILWAY_SERVICE_NAME"))
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SECURE"]   = _IS_PRODUCTION
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# CSRFトークンはSECURE接続でのみ送信（本番のみ）
+app.config["WTF_CSRF_SSL_STRICT"] = _IS_PRODUCTION
+
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
+
+csrf    = CSRFProtect(app)
+limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="memory://")
+
+# エージェント認証シークレット。Railway環境変数 AGENT_SECRET と agent.py の定数を同じ値にする
+AGENT_SECRET = os.environ.get("AGENT_SECRET", "")
 
 # RailwayサーバーはUTCなので、表示・判定にはJSTに変換して使う
 JST = datetime.timezone(datetime.timedelta(hours=9))
 
 # gunicornはif __name__ == "__main__"を通らないのでここで初期化する
 init_db()
+
+
+def check_agent_secret() -> bool:
+    """AGENT_SECRETが設定済みの場合、X-Toxov-Keyヘッダーを検証する。"""
+    if not AGENT_SECRET:
+        return True  # 未設定（ローカル開発）はスキップ
+    return request.headers.get("X-Toxov-Key") == AGENT_SECRET
+
+
+@app.before_request
+def force_https():
+    # ProxyFix適用後、request.is_secureはX-Forwarded-Protoを正しく反映する
+    # localhostはHTTPのまま許容する
+    if (not request.is_secure
+            and not request.host.startswith(("localhost", "127.0.0.1"))):
+        return redirect(request.url.replace("http://", "https://", 1), 301)
 
 
 class User(UserMixin):
@@ -96,13 +133,13 @@ def is_blocking_time(config):
 
 
 @app.route("/register", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def register():
     error = None
     if request.method == "POST":
-        username = request.form["username"].strip()
-        password = request.form["password"].strip()
-        # メールアドレスは任意。空文字はNoneとして扱う
-        email    = request.form.get("email", "").strip() or None
+        username = request.form["username"].strip()[:50]
+        password = request.form["password"].strip()[:200]
+        email    = request.form.get("email", "").strip()[:200] or None
         if username and password:
             from database import Session, engine, UserModel
             with Session(engine) as session:
@@ -120,10 +157,13 @@ def register():
 
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute")
 def login():
     error = None
     if request.method == "POST":
-        user = verify_password(request.form["username"], request.form["password"])
+        username = request.form["username"].strip()[:50]
+        password = request.form["password"].strip()[:200]
+        user = verify_password(username, password)
         if user:
             data = get_user_by_id(user["id"])
             login_user(User(data["id"], data["username"], data["api_token"],
@@ -233,8 +273,11 @@ def admin_set_plan():
 
 
 @app.route("/api/connect/<code>")
+@csrf.exempt
 def api_connect(code):
     # 短いコードからユーザーのconfig URLを返す（Windowsエージェントの初回セットアップ用）
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
     user = get_user_by_connect_code(code)
     if not user:
         return jsonify({"error": "invalid code"}), 404
@@ -243,7 +286,10 @@ def api_connect(code):
 
 
 @app.route("/api/config/<token>")
+@csrf.exempt
 def api_config(token):
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
     user = get_user_by_token(token)
     if not user:
         return jsonify({"error": "invalid token"}), 401
@@ -254,7 +300,10 @@ def api_config(token):
 
 
 @app.route("/api/apps/add/<token>", methods=["POST"])
+@csrf.exempt
 def api_apps_add(token):
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
     user = get_user_by_token(token)
     if not user:
         return jsonify({"error": "invalid token"}), 401
@@ -272,11 +321,16 @@ def api_apps_add(token):
 
 
 @app.route("/api/log/<token>", methods=["POST"])
+@csrf.exempt
 def api_log(token):
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
     user = get_user_by_token(token)
     if not user:
         return jsonify({"error": "invalid token"}), 401
-    event = request.json.get("event")
+    # request.jsonがNoneの場合（Content-Type未設定等）は空dictにフォールバック
+    body  = request.json or {}
+    event = body.get("event")
     # 想定外の値がDBに入らないよう許可リストで絞る
     if event in ("block_start", "block_end", "emergency_unblock"):
         add_event_log(user["id"], event)
@@ -285,9 +339,10 @@ def api_log(token):
 
 
 @app.route("/forgot-password", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def forgot_password():
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip()[:200]
         user = get_user_by_email(email) if email else None
         # セキュリティのため、メールが存在しない場合も「送信した」と表示する
         if user:
@@ -323,7 +378,7 @@ def profile():
     message = None
     error   = None
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip()[:200]
         if not email:
             error = "メールアドレスを入力してください"
         elif "@" not in email or "." not in email.split("@")[-1]:

@@ -1,8 +1,11 @@
 flask
 flask-login
 flask-sqlalchemy
+flask-limiter
+flask-wtf
 sqlalchemy
 psycopg2-binary
 werkzeug
 gunicorn
 requests
+resend
