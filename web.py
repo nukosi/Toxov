@@ -203,6 +203,14 @@ def index():
         r["rank"] = get_rank(r["season_points"])
     limits    = get_limits(current_user.plan)
     analytics = get_analytics() if current_user.role == "admin" else None
+    # エージェントが直近90秒以内にpollしていれば接続中とみなす（poll間隔30秒の3倍）
+    user_data       = get_user_by_id(current_user.id)
+    last_active_at  = user_data.get("last_active_at")
+    now_jst         = datetime.datetime.now(JST).replace(tzinfo=None)
+    agent_connected = (
+        last_active_at is not None and
+        (now_jst - last_active_at).total_seconds() < 90
+    )
     return render_template("index.html", config=config, blocking=blocking,
                            saved=saved, api_token=current_user.api_token,
                            connect_code=current_user.connect_code,
@@ -211,7 +219,7 @@ def index():
                            points=points, rank=rank, ranking=ranking, error=error,
                            plan=current_user.plan, limits=limits,
                            role=current_user.role, presets=PRESET_SITES,
-                           analytics=analytics)
+                           analytics=analytics, agent_connected=agent_connected)
 
 
 @app.route("/save", methods=["POST"])

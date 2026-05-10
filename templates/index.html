@@ -197,8 +197,23 @@ details > summary::-webkit-details-marker { display: none; }
     <div style="display:flex; align-items:center; gap:16px;">
       <div style="font-size:.62rem; text-transform:uppercase; letter-spacing:1.2px; color:var(--dim); flex-shrink:0;">PC連携</div>
       <div style="flex:1; text-align:center; letter-spacing:5px; font-size:1.3rem; font-weight:700; color:var(--text); font-family:monospace;">{{ connect_code }}</div>
-      <div style="font-size:.68rem; color:var(--dim); flex-shrink:0;">コードを入力</div>
+      {% if agent_connected %}
+        <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
+          <span class="dot dot-free"></span>
+          <span style="font-size:.68rem; color:var(--dim);">接続中</span>
+        </div>
+      {% else %}
+        <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
+          <span class="dot" style="background:var(--dim);"></span>
+          <span style="font-size:.68rem; color:var(--dim);">未接続</span>
+        </div>
+      {% endif %}
     </div>
+    {% if not agent_connected and blocking %}
+      <div style="font-size:.7rem; color:var(--warning); margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
+        Toxov.exe が起動していません。ブロック解除が反映されない場合があります。
+      </div>
+    {% endif %}
   </div>
 
 </div><!-- /tab-home -->

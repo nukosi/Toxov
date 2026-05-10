@@ -241,7 +241,8 @@ def get_user_by_id(user_id):
         user = session.get(UserModel, user_id)
         return {"id": user.id, "username": user.username, "api_token": user.api_token,
                 "plan": user.plan or "free", "role": user.role or "user",
-                "connect_code": user.connect_code, "email": user.email} if user else None
+                "connect_code": user.connect_code, "email": user.email,
+                "last_active_at": user.last_active_at} if user else None
 
 
 def get_user_by_token(token):
