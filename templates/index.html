@@ -136,12 +136,12 @@ details > summary::-webkit-details-marker { display: none; }
   <!-- ヒーローカード：ストリーク ＋ ステータス -->
   <div class="card" style="padding:28px 28px 24px; margin-bottom:10px;">
     <!-- ストリーク -->
-    <div style="margin-bottom:20px;">
-      <div style="font-size:1.6rem; margin-bottom:6px;">{{ semoji }}</div>
-      <div style="font-size:3.4rem; font-weight:700; letter-spacing:-2px; line-height:1;">
-        {{ streak }}<span style="font-size:1.1rem; font-weight:400; color:var(--muted); margin-left:7px;">日連続</span>
+    <div style="margin-bottom:20px; text-align:center;">
+      <div style="font-size:1.8rem; margin-bottom:8px;">{{ semoji }}</div>
+      <div style="font-size:4.2rem; font-weight:700; letter-spacing:-3px; line-height:1;">
+        {{ streak }}<span style="font-size:1.2rem; font-weight:400; color:var(--muted); margin-left:8px;">日連続</span>
       </div>
-      <div style="font-size:.84rem; color:var(--dim); margin-top:8px;">{{ comment }}</div>
+      <div style="font-size:.88rem; color:var(--muted); margin-top:10px;">{{ comment }}</div>
     </div>
     <!-- ステータス＋スケジュール -->
     <div style="border-top:1px solid var(--border); padding-top:18px; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;">
@@ -163,47 +163,46 @@ details > summary::-webkit-details-marker { display: none; }
   <!-- 継続率 ＋ ポイント -->
   <div class="home-grid">
     <!-- 今週 -->
-    <div class="card" style="margin-bottom:0; text-align:center;">
-      <div class="card-label">今週の継続率</div>
+    <div class="card" style="margin-bottom:0; text-align:center; padding:14px 16px;">
+      <div class="card-label">今週</div>
       {% if weekly_rate.rate is not none %}
-        <div style="font-size:2rem; font-weight:700; letter-spacing:-.5px; color:
+        <div style="font-size:1.6rem; font-weight:700; letter-spacing:-.5px; color:
           {% if weekly_rate.rate >= 80 %}var(--success){% elif weekly_rate.rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};">
           {{ weekly_rate.rate }}%
         </div>
-        <div style="font-size:.76rem; color:var(--dim); margin-top:5px;">{{ weekly_rate.success }}/{{ weekly_rate.total }} 日</div>
+        <div style="font-size:.74rem; color:var(--dim); margin-top:4px;">{{ weekly_rate.success }}/{{ weekly_rate.total }} 日</div>
       {% else %}
-        <div style="font-size:.9rem; color:var(--dim);">データなし</div>
+        <div style="font-size:.86rem; color:var(--dim);">データなし</div>
       {% endif %}
     </div>
     <!-- 今月 -->
-    <div class="card" style="margin-bottom:0; text-align:center;">
-      <div class="card-label">今月の継続率</div>
+    <div class="card" style="margin-bottom:0; text-align:center; padding:14px 16px;">
+      <div class="card-label">今月</div>
       {% if monthly_rate.rate is not none %}
-        <div style="font-size:2rem; font-weight:700; letter-spacing:-.5px; color:
+        <div style="font-size:1.6rem; font-weight:700; letter-spacing:-.5px; color:
           {% if monthly_rate.rate >= 80 %}var(--success){% elif monthly_rate.rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};">
           {{ monthly_rate.rate }}%
         </div>
-        <div style="font-size:.76rem; color:var(--dim); margin-top:5px;">{{ monthly_rate.success }}/{{ monthly_rate.total }} 日</div>
+        <div style="font-size:.74rem; color:var(--dim); margin-top:4px;">{{ monthly_rate.success }}/{{ monthly_rate.total }} 日</div>
       {% else %}
-        <div style="font-size:.9rem; color:var(--dim);">データなし</div>
+        <div style="font-size:.86rem; color:var(--dim);">データなし</div>
       {% endif %}
     </div>
     <!-- ポイント -->
-    <div class="card" style="margin-bottom:0; text-align:center;">
+    <div class="card" style="margin-bottom:0; text-align:center; padding:14px 16px;">
       <div class="card-label">
-        ポイント
-        <span class="badge rank-{{ rank.name|lower }}" style="margin-left:4px;">{{ rank.name }}</span>
+        ポイント <span class="badge rank-{{ rank.name|lower }}">{{ rank.name }}</span>
       </div>
-      <div style="font-size:2rem; font-weight:700; letter-spacing:-.5px; color:var(--accent);">{{ points.season_points }}</div>
-      <div style="font-size:.76rem; color:var(--dim); margin-top:5px;">pt（シーズン）</div>
+      <div style="font-size:1.6rem; font-weight:700; letter-spacing:-.5px; color:var(--accent);">{{ points.season_points }}</div>
+      <div style="font-size:.74rem; color:var(--dim); margin-top:4px;">pt（シーズン）</div>
       {% if rank.next %}
-        <div style="font-size:.72rem; color:var(--dim); margin-top:8px;">{{ rank.next }} まで {{ rank.pts_to_next }}pt</div>
+        <div style="font-size:.7rem; color:var(--dim); margin-top:7px;">{{ rank.next }} まで {{ rank.pts_to_next }}pt</div>
         <div style="background:var(--bg-input); border-radius:3px; height:3px; margin-top:5px; overflow:hidden;">
           <div style="height:3px; width:{{ rank.progress }}%; border-radius:3px;
             background:{% if rank.next == 'Flame' %}var(--warning){% elif rank.next == 'Iron' %}#adb5bd{% elif rank.next == 'Gold' %}#ffd43b{% else %}var(--accent){% endif %};"></div>
         </div>
       {% else %}
-        <div style="font-size:.72rem; color:var(--accent); margin-top:8px;">最高ランク達成</div>
+        <div style="font-size:.7rem; color:var(--accent); margin-top:7px;">最高ランク達成</div>
       {% endif %}
     </div>
   </div>
