@@ -25,7 +25,9 @@ CONFIG_DIR  = os.path.join(os.environ["APPDATA"], "Toxov")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 HOSTS_FILE  = r"C:\Windows\System32\drivers\etc\hosts"
 # hostsファイルに追記する行の末尾に付けるタグ。unblock時にこのタグで自分が書いた行だけ削除する
-BLOCK_TAG   = "# Toxov"
+BLOCK_TAG     = "# Toxov"
+# アプリ名変更前の旧タグ。hostsに残留している場合も除去する
+OLD_BLOCK_TAG = "# nukosisnsblocker"
 JST         = datetime.timezone(datetime.timedelta(hours=9))
 POLL_INTERVAL = 30  # seconds
 
@@ -184,25 +186,32 @@ def block(sites, apps):
             ], capture_output=True)
 
 
-def unblock():
+def unblock(log=None):
     # --- Edge/ChromeのDoHポリシーを削除してデフォルト動作に戻す ---
     set_doh_policy(disable=False)
 
     # --- Webサイト解除 ---
     # BLOCK_TAGが含まれる行だけ除いて書き直す
-    with open(HOSTS_FILE, "r") as f:
-        lines = f.readlines()
-    with open(HOSTS_FILE, "w") as f:
-        for line in lines:
-            if BLOCK_TAG not in line:
-                f.write(line)
-    subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
+    try:
+        with open(HOSTS_FILE, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+        with open(HOSTS_FILE, "w", encoding="utf-8") as f:
+            for line in lines:
+                # 旧タグ（nukosisnsblocker）の残留エントリも合わせて除去する
+                if BLOCK_TAG not in line and OLD_BLOCK_TAG not in line:
+                    f.write(line)
+        subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
+    except Exception as e:
+        if log:
+            log(f"[unblock] hostsファイルエラー: {e}")
 
     # --- アプリ解除：Toxovという名前のファイアウォールルールをすべて削除 ---
-    subprocess.run(
+    result = subprocess.run(
         ["netsh", "advfirewall", "firewall", "delete", "rule", "name=Toxov"],
-        capture_output=True
+        capture_output=True, text=True
     )
+    if log and result.returncode != 0:
+        log(f"[unblock] firewall削除エラー rc={result.returncode} {result.stderr.strip()}")
 
 
 def notify(message):
@@ -350,7 +359,7 @@ if ($form.ShowDialog() -eq 'OK' -and $lv.SelectedItems.Count -gt 0) {
 
     def quit_action(icon, item):
         # 終了時にhostsとファイアウォールを掃除してからアイコンを閉じる
-        unblock()
+        unblock(log)
         icon.stop()
 
     menu = pystray.Menu(
@@ -393,7 +402,7 @@ def apply_config(config, current_state, last_version, log):
 
     if emergency:
         if current_state is not False:
-            unblock()
+            unblock(log)
         # current_state が True のときだけログに残す（起動時の None → False は記録しない）
         if current_state is True:
             log("緊急解除 実行")
@@ -412,7 +421,7 @@ def apply_config(config, current_state, last_version, log):
         return True, version, events
     else:
         if current_state is not False:
-            unblock()
+            unblock(log)
         # True → False の遷移のみ記録（起動時の None → False は記録しない）
         if current_state is True:
             log("解除 実行")
