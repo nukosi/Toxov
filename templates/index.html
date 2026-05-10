@@ -2,25 +2,13 @@
 {% block title %}Toxov{% endblock %}
 
 {% block sidebar %}
-<!-- ステータス -->
-<div class="sb-status">
-  {% if config.emergency_unblock %}
-    <span class="dot dot-emerg"></span> 緊急解除中
-  {% elif blocking %}
-    <span class="dot dot-block"></span> ブロック中
-  {% else %}
-    <span class="dot dot-free"></span> 解除中
-  {% endif %}
-</div>
-<div class="divider"></div>
-
-<a href="#home" class="sb-link active" data-nav="home">
+<a href="#" class="sb-link active" data-tab="home">
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M1.5 7L8 1.5 14.5 7V14a.5.5 0 01-.5.5H5v-4h6v4H2.5A.5.5 0 012 14V7z"/>
   </svg>
   ホーム
 </a>
-<a href="#settings" class="sb-link" data-nav="settings">
+<a href="#" class="sb-link" data-tab="settings">
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
     <line x1="1" y1="4"  x2="15" y2="4"/>
     <line x1="1" y1="8"  x2="15" y2="8"/>
@@ -29,22 +17,23 @@
     <circle cx="11" cy="8"  r="1.8" fill="var(--bg-card)"/>
     <circle cx="7"  cy="12" r="1.8" fill="var(--bg-card)"/>
   </svg>
-  設定
+  ブロック設定
 </a>
-<a href="#log" class="sb-link" data-nav="log">
+<a href="#" class="sb-link" data-tab="ranking">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="1"  y="9"  width="4" height="6" rx=".5"/>
+    <rect x="6"  y="5"  width="4" height="10" rx=".5"/>
+    <rect x="11" y="2"  width="4" height="13" rx=".5"/>
+  </svg>
+  ランキング
+</a>
+<a href="#" class="sb-link" data-tab="log">
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
     <line x1="2" y1="4"  x2="14" y2="4"/>
     <line x1="2" y1="8"  x2="14" y2="8"/>
     <line x1="2" y1="12" x2="9"  y2="12"/>
   </svg>
   ログ
-</a>
-<a href="#connect" class="sb-link" data-nav="connect">
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M7 9a3 3 0 004.12.88l2-2a3 3 0 00-4.24-4.24L7.76 5"/>
-    <path d="M9 7a3 3 0 00-4.12-.88l-2 2a3 3 0 004.24 4.24L8.24 11"/>
-  </svg>
-  PC連携
 </a>
 {% endblock %}
 
@@ -65,7 +54,7 @@
   ログアウト
 </a>
 {% if role == "admin" %}
-<a href="#admin" class="sb-link" data-nav="admin" style="color:#5a6ad4; margin-top:2px;">
+<a href="#" class="sb-link" data-tab="admin" style="color:#5a6ad4;">
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
     <circle cx="8" cy="8" r="2.5"/>
     <path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M3.2 12.8l1.1-1.1M11.7 4.3l1.1-1.1"/>
@@ -75,284 +64,24 @@
 {% endif %}
 {% endblock %}
 
-{% block content %}
-
-<!-- バナー -->
-{% if saved %}
-  <div class="banner banner-ok">設定を保存しました</div>
-{% endif %}
-{% if error == "blocking" %}
-  <div class="banner banner-err">ブロック時間中はスケジュール変更・削除はできません</div>
-{% elif error == "site_limit" %}
-  <div class="banner banner-err">無料プランではサイトを{{ limits.max_sites }}件まで登録できます</div>
-{% elif error == "app_limit" %}
-  <div class="banner banner-err">無料プランではアプリを{{ limits.max_apps }}件まで登録できます</div>
-{% endif %}
-
-<!-- ─── HOME ─── -->
-<div id="home">
-
-  <!-- ストリーク -->
-  <div class="card" style="text-align:center; padding:26px 20px;">
-    <div style="font-size:2rem; margin-bottom:6px;">{{ semoji }}</div>
-    <div style="font-size:2.8rem; font-weight:700; letter-spacing:-1.5px; line-height:1;">
-      {{ streak }}<span style="font-size:1rem; font-weight:400; color:var(--muted); margin-left:5px;">日連続</span>
-    </div>
-    <div style="font-size:.8rem; color:var(--dim); margin-top:8px;">{{ comment }}</div>
-  </div>
-
-  <!-- 継続率 -->
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-    <div class="card" style="margin-bottom:0; text-align:center;">
-      <div class="card-label">今週</div>
-      {% if weekly_rate.rate is not none %}
-        <div style="font-size:1.9rem; font-weight:700; letter-spacing:-.5px; color:
-          {% if weekly_rate.rate >= 80 %}var(--success)
-          {% elif weekly_rate.rate >= 50 %}var(--warning)
-          {% else %}var(--danger){% endif %};">{{ weekly_rate.rate }}%</div>
-        <div style="font-size:.74rem; color:var(--dim); margin-top:4px;">{{ weekly_rate.success }}/{{ weekly_rate.total }} 日</div>
-      {% else %}
-        <div style="font-size:.9rem; color:var(--dim);">データなし</div>
-      {% endif %}
-    </div>
-    <div class="card" style="margin-bottom:0; text-align:center;">
-      <div class="card-label">今月</div>
-      {% if monthly_rate.rate is not none %}
-        <div style="font-size:1.9rem; font-weight:700; letter-spacing:-.5px; color:
-          {% if monthly_rate.rate >= 80 %}var(--success)
-          {% elif monthly_rate.rate >= 50 %}var(--warning)
-          {% else %}var(--danger){% endif %};">{{ monthly_rate.rate }}%</div>
-        <div style="font-size:.74rem; color:var(--dim); margin-top:4px;">{{ monthly_rate.success }}/{{ monthly_rate.total }} 日</div>
-      {% else %}
-        <div style="font-size:.9rem; color:var(--dim);">データなし</div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- ポイント＆ランク -->
-  <div class="card">
-    <div class="card-label">
-      ポイント
-      <span class="badge rank-{{ rank.name|lower }}" style="margin-left:6px;">{{ rank.name }}</span>
-    </div>
-    <div style="display:grid; grid-template-columns:1fr 1px 1fr; margin-bottom:14px;">
-      <div style="text-align:center; padding:0 12px;">
-        <div style="font-size:.74rem; color:var(--muted); margin-bottom:4px;">シーズン</div>
-        <div style="font-size:1.7rem; font-weight:700; letter-spacing:-.5px; color:var(--accent);">{{ points.season_points }}</div>
-        <div style="font-size:.72rem; color:var(--dim);">pt</div>
-      </div>
-      <div style="background:var(--border);"></div>
-      <div style="text-align:center; padding:0 12px;">
-        <div style="font-size:.74rem; color:var(--muted); margin-bottom:4px;">通算</div>
-        <div style="font-size:1.7rem; font-weight:700; letter-spacing:-.5px; color:var(--muted);">{{ points.lifetime_points }}</div>
-        <div style="font-size:.72rem; color:var(--dim);">pt</div>
-      </div>
-    </div>
-    {% if rank.next %}
-      <div style="display:flex; justify-content:space-between; font-size:.72rem; color:var(--dim); margin-bottom:6px;">
-        <span>{{ rank.name }}</span>
-        <span>{{ rank.next }} まで {{ rank.pts_to_next }}pt</span>
-      </div>
-      <div style="background:var(--bg-input); border-radius:3px; height:3px; overflow:hidden;">
-        <div style="height:3px; width:{{ rank.progress }}%; border-radius:3px;
-          background:{% if rank.next == 'Flame' %}var(--warning){% elif rank.next == 'Iron' %}#adb5bd{% elif rank.next == 'Gold' %}#ffd43b{% else %}var(--accent){% endif %};"></div>
-      </div>
-    {% else %}
-      <div style="font-size:.72rem; color:var(--accent); text-align:center;">最高ランク達成</div>
-    {% endif %}
-  </div>
-
-  <!-- ランキング -->
-  <div class="card">
-    <div class="card-label">シーズンランキング</div>
-    {% if ranking %}
-      <table style="width:100%; font-size:.82rem; border-collapse:collapse;">
-        {% for r in ranking %}
-        <tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:6px 0; color:var(--dim); width:22px; font-variant-numeric:tabular-nums;">{{ loop.index }}</td>
-          <td style="padding:6px 0; color:{% if r.username == current_user.username %}var(--accent){% else %}var(--muted){% endif %};">
-            {{ r.username }}
-            <span class="badge rank-{{ r.rank.name|lower }}">{{ r.rank.name }}</span>
-          </td>
-          <td style="padding:6px 0; color:var(--accent); text-align:right; font-weight:600; font-variant-numeric:tabular-nums;">{{ r.season_points }} pt</td>
-        </tr>
-        {% endfor %}
-      </table>
-    {% else %}
-      <p style="font-size:.82rem; color:var(--dim);">データなし</p>
-    {% endif %}
-  </div>
-
-</div><!-- /home -->
-
-<!-- ─── SETTINGS ─── -->
-<p class="sec" id="settings">設定</p>
-
-<form action="/save" method="post">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-  <!-- ブロック時間 -->
-  <div class="card">
-    <div class="card-label">ブロック時間</div>
-    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-      <label style="font-size:.84rem; color:var(--muted); margin:0;">開始</label>
-      <input type="time" name="block_start" value="{{ config.block_start }}"
-             {% if blocking %}readonly{% endif %} required>
-      <label style="font-size:.84rem; color:var(--muted); margin:0;">終了</label>
-      <input type="time" name="block_end" value="{{ config.block_end }}"
-             {% if blocking %}readonly{% endif %} required>
-    </div>
-    {% if blocking %}<p class="lock-note">ブロック時間中は変更できません</p>{% endif %}
-  </div>
-
-  <!-- サイト -->
-  <div class="card">
-    <div class="card-label">
-      ブロックするサイト
-      <span style="font-size:.7rem; font-weight:400; color:var(--dim); margin-left:4px;">
-        {% if plan == 'premium' %}Premium{% else %}{{ config.sites|length }}/{{ limits.max_sites }}{% endif %}
-      </span>
-    </div>
-
-    {% for cat in presets %}
-      {% if not cat.collapsed %}
-        <p style="font-size:.62rem; text-transform:uppercase; letter-spacing:1px; color:var(--dim); margin-bottom:7px;">{{ cat.category }}</p>
-        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
-          {% for site in cat.sites %}
-          <button type="button" class="preset-btn" data-domains="{{ site.domains|join(',') }}" onclick="togglePreset(this)">
-            <img src="https://www.google.com/s2/favicons?domain={{ site.domains[0] }}&sz=32"
-                 width="16" height="16" style="border-radius:3px;" loading="lazy"
-                 onerror="this.src='https://icons.duckduckgo.com/ip3/{{ site.domains[0] }}.ico';this.onerror=null;">
-            {{ site.name }}
-          </button>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endfor %}
-
-    <details>
-      <summary style="font-size:.74rem; color:var(--dim); cursor:pointer; margin-bottom:8px; user-select:none;">▸ 成人向け</summary>
-      <div style="display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 12px;">
-        {% for cat in presets %}{% if cat.collapsed %}{% for site in cat.sites %}
-        <button type="button" class="preset-btn" data-domains="{{ site.domains|join(',') }}" onclick="togglePreset(this)">
-          <img src="https://www.google.com/s2/favicons?domain={{ site.domains[0] }}&sz=32"
-               width="16" height="16" style="border-radius:3px;" loading="lazy">
-          {{ site.name }}
-        </button>
-        {% endfor %}{% endif %}{% endfor %}
-      </div>
-    </details>
-
-    <textarea id="sites-ta" name="sites" style="height:110px;">{{ config.sites|join('\n') }}</textarea>
-    <p class="hint">1行に1サイト（例: instagram.com）</p>
-    {% if blocking %}<p class="lock-note">ブロック時間中は削除できません（追加のみ可）</p>{% endif %}
-  </div>
-
-  <!-- アプリ -->
-  <div class="card">
-    <div class="card-label">
-      ブロックするアプリ
-      <span style="font-size:.7rem; font-weight:400; color:var(--dim); margin-left:4px;">
-        {% if plan == 'premium' %}Premium{% else %}{{ config.apps|length }}/{{ limits.max_apps }}{% endif %}
-      </span>
-    </div>
-    <textarea name="apps" style="height:90px;">{{ config.apps|join('\n') }}</textarea>
-    <p class="hint">1行に1つ、実行ファイルのフルパス（例: C:\...\game.exe）</p>
-    {% if blocking %}<p class="lock-note">ブロック時間中は削除できません（追加のみ可）</p>{% endif %}
-  </div>
-
-  <button type="submit" class="btn btn-primary btn-full">設定を保存</button>
-</form>
-
-<!-- 緊急解除 -->
-<div class="card" style="margin-top:10px;">
-  <div class="card-label">緊急解除</div>
-  {% if config.emergency_unblock %}
-    <p style="font-size:.84rem; color:var(--warning); margin-bottom:10px;">現在緊急解除中です。ブロックを再開するには下のボタンを押してください。</p>
-    <form action="/resume" method="post">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn btn-success btn-full">ブロックを再開する</button>
-    </form>
-  {% else %}
-    <p style="font-size:.82rem; color:var(--dim); margin-bottom:10px;">ブロック時間中に一時的に解除します</p>
-    <form action="/emergency" method="post">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn btn-danger btn-full">緊急解除</button>
-    </form>
-  {% endif %}
-</div>
-
-<!-- ─── LOG ─── -->
-<p class="sec" id="log">ログ</p>
-<div class="card">
-  {% if logs %}
-    <table style="width:100%; font-size:.82rem; border-collapse:collapse;">
-      {% for l in logs %}
-      <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:6px 0; color:var(--dim); width:110px; font-variant-numeric:tabular-nums;">{{ l.created_at }}</td>
-        <td style="padding:6px 0; color:
-          {% if l.event == 'block_start' %}var(--danger)
-          {% elif l.event == 'block_end' %}var(--success)
-          {% else %}var(--warning){% endif %};">
-          {% if l.event == 'block_start' %}ブロック開始
-          {% elif l.event == 'block_end' %}ブロック終了
-          {% else %}緊急解除{% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-  {% else %}
-    <p style="font-size:.82rem; color:var(--dim);">まだログがありません</p>
-  {% endif %}
-</div>
-
-<!-- ─── CONNECT ─── -->
-<p class="sec" id="connect">PC連携</p>
-<div class="card">
-  <p style="font-size:.82rem; color:var(--muted); margin-bottom:14px;">Toxov.exe を起動して、このコードを入力してください</p>
-  <div style="text-align:center; background:var(--bg-input); border-radius:var(--rs); padding:18px;
-              letter-spacing:6px; font-size:1.8rem; font-weight:700; color:var(--accent); font-family:monospace;">
-    {{ connect_code }}
-  </div>
-  <details style="margin-top:12px;">
-    <summary style="font-size:.74rem; color:var(--dim); cursor:pointer; user-select:none;">▸ APIトークンURL（上級者向け）</summary>
-    <code style="display:block; background:var(--bg-input); padding:10px; border-radius:var(--rs); font-size:.72rem;
-                 word-break:break-all; color:var(--dim); margin-top:8px;">
-      https://{{ request.host }}/api/config/{{ api_token }}
-    </code>
-  </details>
-</div>
-
-<!-- ─── ADMIN ─── -->
-{% if role == "admin" %}
-<p class="sec" id="admin">開発者モード</p>
-<div class="card" style="border-color:#1e1e3a;">
-  <div class="card-label" style="color:#6c7bd4;">admin</div>
-  <p style="font-size:.8rem; color:var(--dim); margin-bottom:12px;">プランを切り替えて制限の動作を確認できます</p>
-  <div style="font-size:.82rem; color:var(--muted); margin-bottom:10px;">
-    現在: <strong style="color:{% if plan == 'premium' %}var(--warning){% else %}var(--muted){% endif %};">{{ plan }}</strong>
-  </div>
-  <div style="display:flex; gap:8px;">
-    <form action="/admin/set-plan" method="post" style="flex:1;">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="plan" value="free">
-      <button type="submit" class="btn btn-ghost btn-full"
-        {% if plan == 'free' %}style="color:var(--text);"{% endif %}>free</button>
-    </form>
-    <form action="/admin/set-plan" method="post" style="flex:1;">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="plan" value="premium">
-      <button type="submit" class="btn btn-ghost btn-full"
-        {% if plan == 'premium' %}style="color:var(--warning); border-color:#4a3400;"{% endif %}>premium</button>
-    </form>
-  </div>
-</div>
-{% endif %}
-
-<div style="height:40px;"></div>
-{% endblock %}
-
 {% block extra_style %}
+.tab { display: none; }
+.tab.active { display: block; }
+
+/* ホームグリッド */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.home-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
 /* プリセットボタン */
 .preset-btn {
   display: inline-flex;
@@ -369,17 +98,397 @@
   font-family: inherit;
   transition: border-color .12s, color .12s, background .12s;
 }
-.preset-btn:hover { border-color: #333; color: var(--text); }
+.preset-btn:hover  { border-color: #333; color: var(--text); }
 .preset-btn.active { background: #0d2018; border-color: #1c3d28; color: var(--success); }
 
-details > summary::-webkit-details-marker { display: none; }
 details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+
+/* ランク */
+.rank-seed    { color:#888;    background:#141414; border-color:#2a2a2a; }
+.rank-flame   { color:#ffa94d; background:#1e1500; border-color:#4a3400; }
+.rank-iron    { color:#adb5bd; background:#141414; border-color:#3a3d40; }
+.rank-gold    { color:#ffd43b; background:#1a1500; border-color:#4a3f00; }
+.rank-diamond { color:#74c0fc; background:#091422; border-color:#143060; }
+{% endblock %}
+
+{% block content %}
+
+<!-- ─── バナー（全タブ共通） ─── -->
+<div id="banners">
+  {% if saved %}
+    <div class="banner banner-ok">設定を保存しました</div>
+  {% endif %}
+  {% if error == "blocking" %}
+    <div class="banner banner-err">ブロック時間中はスケジュール変更・削除はできません</div>
+  {% elif error == "site_limit" %}
+    <div class="banner banner-err">無料プランではサイトを{{ limits.max_sites }}件まで登録できます</div>
+  {% elif error == "app_limit" %}
+    <div class="banner banner-err">無料プランではアプリを{{ limits.max_apps }}件まで登録できます</div>
+  {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════
+     ホーム
+═══════════════════════════════════════ -->
+<div id="tab-home" class="tab">
+
+  <!-- ステータス -->
+  <div class="card" style="margin-bottom:10px; display:flex; align-items:center; gap:10px;">
+    {% if config.emergency_unblock %}
+      <span class="dot dot-emerg"></span>
+      <span style="font-weight:600; color:var(--warning);">緊急解除中</span>
+    {% elif blocking %}
+      <span class="dot dot-block"></span>
+      <span style="font-weight:600; color:var(--danger);">ブロック中</span>
+      <span style="color:var(--dim); font-size:.82rem;">{{ config.block_start }} ～ {{ config.block_end }}</span>
+    {% else %}
+      <span class="dot dot-free"></span>
+      <span style="font-weight:600; color:var(--success);">解除中</span>
+      <span style="color:var(--dim); font-size:.82rem;">{{ config.block_start }} ～ {{ config.block_end }}</span>
+    {% endif %}
+  </div>
+
+  <!-- ストリーク -->
+  <div class="card" style="text-align:center; padding:32px 20px; margin-bottom:10px;">
+    <div style="font-size:2.2rem; margin-bottom:8px;">{{ semoji }}</div>
+    <div style="font-size:3rem; font-weight:700; letter-spacing:-2px; line-height:1;">
+      {{ streak }}<span style="font-size:1.1rem; font-weight:400; color:var(--muted); margin-left:6px;">日連続</span>
+    </div>
+    <div style="font-size:.85rem; color:var(--dim); margin-top:10px;">{{ comment }}</div>
+  </div>
+
+  <!-- 継続率 ＋ ポイント -->
+  <div class="home-grid">
+    <!-- 今週 -->
+    <div class="card" style="margin-bottom:0; text-align:center;">
+      <div class="card-label">今週の継続率</div>
+      {% if weekly_rate.rate is not none %}
+        <div style="font-size:2rem; font-weight:700; letter-spacing:-.5px; color:
+          {% if weekly_rate.rate >= 80 %}var(--success){% elif weekly_rate.rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};">
+          {{ weekly_rate.rate }}%
+        </div>
+        <div style="font-size:.76rem; color:var(--dim); margin-top:5px;">{{ weekly_rate.success }}/{{ weekly_rate.total }} 日</div>
+      {% else %}
+        <div style="font-size:.9rem; color:var(--dim);">データなし</div>
+      {% endif %}
+    </div>
+    <!-- 今月 -->
+    <div class="card" style="margin-bottom:0; text-align:center;">
+      <div class="card-label">今月の継続率</div>
+      {% if monthly_rate.rate is not none %}
+        <div style="font-size:2rem; font-weight:700; letter-spacing:-.5px; color:
+          {% if monthly_rate.rate >= 80 %}var(--success){% elif monthly_rate.rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};">
+          {{ monthly_rate.rate }}%
+        </div>
+        <div style="font-size:.76rem; color:var(--dim); margin-top:5px;">{{ monthly_rate.success }}/{{ monthly_rate.total }} 日</div>
+      {% else %}
+        <div style="font-size:.9rem; color:var(--dim);">データなし</div>
+      {% endif %}
+    </div>
+    <!-- ポイント -->
+    <div class="card" style="margin-bottom:0; text-align:center;">
+      <div class="card-label">
+        ポイント
+        <span class="badge rank-{{ rank.name|lower }}" style="margin-left:4px;">{{ rank.name }}</span>
+      </div>
+      <div style="font-size:2rem; font-weight:700; letter-spacing:-.5px; color:var(--accent);">{{ points.season_points }}</div>
+      <div style="font-size:.76rem; color:var(--dim); margin-top:5px;">pt（シーズン）</div>
+      {% if rank.next %}
+        <div style="font-size:.72rem; color:var(--dim); margin-top:8px;">{{ rank.next }} まで {{ rank.pts_to_next }}pt</div>
+        <div style="background:var(--bg-input); border-radius:3px; height:3px; margin-top:5px; overflow:hidden;">
+          <div style="height:3px; width:{{ rank.progress }}%; border-radius:3px;
+            background:{% if rank.next == 'Flame' %}var(--warning){% elif rank.next == 'Iron' %}#adb5bd{% elif rank.next == 'Gold' %}#ffd43b{% else %}var(--accent){% endif %};"></div>
+        </div>
+      {% else %}
+        <div style="font-size:.72rem; color:var(--accent); margin-top:8px;">最高ランク達成</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 緊急解除 ＋ PC連携 -->
+  <div class="home-grid-2">
+    <!-- 緊急解除 -->
+    <div class="card" style="margin-bottom:0;">
+      <div class="card-label">緊急解除</div>
+      {% if config.emergency_unblock %}
+        <p style="font-size:.82rem; color:var(--warning); margin-bottom:10px;">現在緊急解除中です</p>
+        <form action="/resume" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-success btn-full">ブロックを再開する</button>
+        </form>
+      {% else %}
+        <p style="font-size:.82rem; color:var(--dim); margin-bottom:10px;">ブロック時間中に一時的に解除します</p>
+        <form action="/emergency" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-danger btn-full">緊急解除</button>
+        </form>
+      {% endif %}
+    </div>
+    <!-- PC連携 -->
+    <div class="card" style="margin-bottom:0;">
+      <div class="card-label">PC連携コード</div>
+      <p style="font-size:.8rem; color:var(--muted); margin-bottom:12px;">Toxov.exe を起動してこのコードを入力</p>
+      <div style="text-align:center; background:var(--bg-input); border-radius:var(--rs); padding:14px;
+                  letter-spacing:6px; font-size:1.6rem; font-weight:700; color:var(--accent); font-family:monospace;">
+        {{ connect_code }}
+      </div>
+    </div>
+  </div>
+
+</div><!-- /tab-home -->
+
+<!-- ═══════════════════════════════════════
+     ブロック設定
+═══════════════════════════════════════ -->
+<div id="tab-settings" class="tab">
+
+  <form action="/save" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <!-- ブロック時間 -->
+    <div class="card">
+      <div class="card-label">ブロック時間</div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <label style="font-size:.84rem; color:var(--muted); margin:0;">開始</label>
+        <input type="time" name="block_start" value="{{ config.block_start }}"
+               {% if blocking %}readonly{% endif %} required>
+        <label style="font-size:.84rem; color:var(--muted); margin:0;">終了</label>
+        <input type="time" name="block_end" value="{{ config.block_end }}"
+               {% if blocking %}readonly{% endif %} required>
+      </div>
+      {% if blocking %}<p class="lock-note">ブロック時間中は変更できません</p>{% endif %}
+    </div>
+
+    <!-- サイト -->
+    <div class="card">
+      <div class="card-label">
+        ブロックするサイト
+        <span style="font-size:.7rem; font-weight:400; color:var(--dim); margin-left:4px;">
+          {% if plan == 'premium' %}Premium{% else %}{{ config.sites|length }}/{{ limits.max_sites }}{% endif %}
+        </span>
+      </div>
+
+      {% for cat in presets %}
+        {% if not cat.collapsed %}
+          <p style="font-size:.62rem; text-transform:uppercase; letter-spacing:1px; color:var(--dim); margin-bottom:7px;">{{ cat.category }}</p>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">
+            {% for site in cat.sites %}
+            <button type="button" class="preset-btn" data-domains="{{ site.domains|join(',') }}" onclick="togglePreset(this)">
+              <img src="https://www.google.com/s2/favicons?domain={{ site.domains[0] }}&sz=32"
+                   width="16" height="16" style="border-radius:3px;" loading="lazy"
+                   onerror="this.src='https://icons.duckduckgo.com/ip3/{{ site.domains[0] }}.ico';this.onerror=null;">
+              {{ site.name }}
+            </button>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+
+      <details>
+        <summary style="font-size:.74rem; color:var(--dim); cursor:pointer; margin-bottom:8px; user-select:none;">▸ 成人向け</summary>
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 14px;">
+          {% for cat in presets %}{% if cat.collapsed %}{% for site in cat.sites %}
+          <button type="button" class="preset-btn" data-domains="{{ site.domains|join(',') }}" onclick="togglePreset(this)">
+            <img src="https://www.google.com/s2/favicons?domain={{ site.domains[0] }}&sz=32"
+                 width="16" height="16" style="border-radius:3px;" loading="lazy">
+            {{ site.name }}
+          </button>
+          {% endfor %}{% endif %}{% endfor %}
+        </div>
+      </details>
+
+      <textarea id="sites-ta" name="sites" style="height:120px;">{{ config.sites|join('\n') }}</textarea>
+      <p class="hint">1行に1サイト（例: instagram.com）</p>
+      {% if blocking %}<p class="lock-note">ブロック時間中は削除できません（追加のみ可）</p>{% endif %}
+    </div>
+
+    <!-- アプリ -->
+    <div class="card">
+      <div class="card-label">
+        ブロックするアプリ
+        <span style="font-size:.7rem; font-weight:400; color:var(--dim); margin-left:4px;">
+          {% if plan == 'premium' %}Premium{% else %}{{ config.apps|length }}/{{ limits.max_apps }}{% endif %}
+        </span>
+      </div>
+      <textarea name="apps" style="height:100px;">{{ config.apps|join('\n') }}</textarea>
+      <p class="hint">1行に1つ、実行ファイルのフルパス（例: C:\...\game.exe）</p>
+      {% if blocking %}<p class="lock-note">ブロック時間中は削除できません（追加のみ可）</p>{% endif %}
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-full">設定を保存</button>
+  </form>
+
+</div><!-- /tab-settings -->
+
+<!-- ═══════════════════════════════════════
+     ランキング
+═══════════════════════════════════════ -->
+<div id="tab-ranking" class="tab">
+  <div class="card">
+    <div class="card-label">シーズンランキング</div>
+    {% if ranking %}
+      <table style="width:100%; font-size:.9rem; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="padding:8px 0; text-align:left; color:var(--dim); font-size:.72rem; font-weight:600; width:36px;">#</th>
+            <th style="padding:8px 0; text-align:left; color:var(--dim); font-size:.72rem; font-weight:600;">ユーザー</th>
+            <th style="padding:8px 0; text-align:right; color:var(--dim); font-size:.72rem; font-weight:600;">シーズンpt</th>
+            <th style="padding:8px 0; text-align:right; color:var(--dim); font-size:.72rem; font-weight:600; padding-left:20px;">通算pt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in ranking %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px 0; color:var(--dim); font-variant-numeric:tabular-nums;">{{ loop.index }}</td>
+            <td style="padding:10px 0; color:{% if r.username == current_user.username %}var(--accent){% else %}var(--text){% endif %}; font-weight:{% if r.username == current_user.username %}600{% else %}400{% endif %};">
+              {{ r.username }}
+              <span class="badge rank-{{ r.rank.name|lower }}" style="margin-left:6px;">{{ r.rank.name }}</span>
+            </td>
+            <td style="padding:10px 0; color:var(--accent); text-align:right; font-weight:600; font-variant-numeric:tabular-nums;">{{ r.season_points }}</td>
+            <td style="padding:10px 0; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums; padding-left:20px;">{{ r.lifetime_points }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p style="font-size:.9rem; color:var(--dim);">データなし</p>
+    {% endif %}
+  </div>
+
+  <!-- 自分のポイント詳細 -->
+  <div class="card">
+    <div class="card-label">自分のポイント</div>
+    <div style="display:grid; grid-template-columns:1fr 1px 1fr; margin-bottom:16px;">
+      <div style="text-align:center; padding:0 16px;">
+        <div style="font-size:.76rem; color:var(--muted); margin-bottom:6px;">シーズン</div>
+        <div style="font-size:2rem; font-weight:700; color:var(--accent);">{{ points.season_points }}</div>
+        <div style="font-size:.74rem; color:var(--dim);">pt</div>
+      </div>
+      <div style="background:var(--border);"></div>
+      <div style="text-align:center; padding:0 16px;">
+        <div style="font-size:.76rem; color:var(--muted); margin-bottom:6px;">通算</div>
+        <div style="font-size:2rem; font-weight:700; color:var(--muted);">{{ points.lifetime_points }}</div>
+        <div style="font-size:.74rem; color:var(--dim);">pt</div>
+      </div>
+    </div>
+    {% if rank.next %}
+      <div style="display:flex; justify-content:space-between; font-size:.76rem; color:var(--dim); margin-bottom:7px;">
+        <span>現在: <strong style="color:var(--text);">{{ rank.name }}</strong></span>
+        <span>次: <strong>{{ rank.next }}</strong> まで {{ rank.pts_to_next }}pt</span>
+      </div>
+      <div style="background:var(--bg-input); border-radius:4px; height:4px; overflow:hidden;">
+        <div style="height:4px; width:{{ rank.progress }}%; border-radius:4px;
+          background:{% if rank.next == 'Flame' %}var(--warning){% elif rank.next == 'Iron' %}#adb5bd{% elif rank.next == 'Gold' %}#ffd43b{% else %}var(--accent){% endif %};"></div>
+      </div>
+    {% else %}
+      <div style="text-align:center; font-size:.8rem; color:var(--accent);">最高ランク達成</div>
+    {% endif %}
+  </div>
+
+</div><!-- /tab-ranking -->
+
+<!-- ═══════════════════════════════════════
+     ログ
+═══════════════════════════════════════ -->
+<div id="tab-log" class="tab">
+  <div class="card">
+    <div class="card-label">イベントログ</div>
+    {% if logs %}
+      <table style="width:100%; font-size:.88rem; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="padding:8px 0; text-align:left; color:var(--dim); font-size:.72rem; font-weight:600; width:140px;">日時</th>
+            <th style="padding:8px 0; text-align:left; color:var(--dim); font-size:.72rem; font-weight:600;">イベント</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in logs %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:9px 0; color:var(--dim); font-variant-numeric:tabular-nums; font-size:.82rem;">{{ l.created_at }}</td>
+            <td style="padding:9px 0; font-weight:500; color:
+              {% if l.event == 'block_start' %}var(--danger)
+              {% elif l.event == 'block_end' %}var(--success)
+              {% else %}var(--warning){% endif %};">
+              {% if l.event == 'block_start' %}ブロック開始
+              {% elif l.event == 'block_end' %}ブロック終了
+              {% else %}緊急解除{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p style="font-size:.9rem; color:var(--dim);">まだログがありません</p>
+    {% endif %}
+  </div>
+</div><!-- /tab-log -->
+
+<!-- ═══════════════════════════════════════
+     開発者（admin のみ）
+═══════════════════════════════════════ -->
+{% if role == "admin" %}
+<div id="tab-admin" class="tab">
+  <div class="card" style="border-color:#1e1e3a;">
+    <div class="card-label" style="color:#6c7bd4;">開発者モード</div>
+    <p style="font-size:.84rem; color:var(--dim); margin-bottom:14px;">プランを切り替えて制限の動作を確認できます</p>
+    <div style="font-size:.84rem; color:var(--muted); margin-bottom:12px;">
+      現在のプラン: <strong style="color:{% if plan == 'premium' %}var(--warning){% else %}var(--text){% endif %};">{{ plan }}</strong>
+    </div>
+    <div style="display:flex; gap:8px; max-width:300px;">
+      <form action="/admin/set-plan" method="post" style="flex:1;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="plan" value="free">
+        <button type="submit" class="btn btn-ghost btn-full"
+          {% if plan == 'free' %}style="color:var(--text);"{% endif %}>free</button>
+      </form>
+      <form action="/admin/set-plan" method="post" style="flex:1;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="plan" value="premium">
+        <button type="submit" class="btn btn-ghost btn-full"
+          {% if plan == 'premium' %}style="color:var(--warning); border-color:#4a3400;"{% endif %}>premium</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
 <script>
   const BLOCKING = {{ 'true' if blocking else 'false' }};
 
+  // ─── タブ切り替え ───
+  function showTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.sb-link[data-tab]').forEach(l => l.classList.remove('active'));
+    const tab = document.getElementById('tab-' + name);
+    if (tab) tab.classList.add('active');
+    const link = document.querySelector(`.sb-link[data-tab="${name}"]`);
+    if (link) link.classList.add('active');
+    // 保存・エラー後はhomeに戻るがbannerは残す
+    if (name !== 'home') {
+      document.getElementById('banners').style.display = 'none';
+    } else {
+      document.getElementById('banners').style.display = '';
+    }
+    sessionStorage.setItem('toxov-tab', name);
+  }
+
+  document.querySelectorAll('.sb-link[data-tab]').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      showTab(link.dataset.tab);
+    });
+  });
+
+  // 初期タブ（保存後リダイレクト時はsettingsを維持）
+  const savedTab = sessionStorage.getItem('toxov-tab') || 'home';
+  const initialTab = {{ '"settings"' if saved or error else 'savedTab' }};
+  showTab(initialTab);
+
+  // ─── プリセット ───
   function getTA() {
     return document.getElementById('sites-ta').value.split('\n').map(s => s.trim()).filter(Boolean);
   }
@@ -401,38 +510,9 @@ details > summary { list-style: none; }
   function syncPresets() {
     const cur = getTA();
     document.querySelectorAll('.preset-btn').forEach(btn => {
-      const domains = btn.dataset.domains.split(',');
-      btn.classList.toggle('active', domains.every(d => cur.includes(d)));
+      btn.classList.toggle('active', btn.dataset.domains.split(',').every(d => cur.includes(d)));
     });
   }
-
-  // サイドバーのアクティブ状態をスクロールに合わせて更新する
-  const navLinks = document.querySelectorAll('.sb-link[data-nav]');
-  const sections = [...navLinks].map(l => ({
-    link: l,
-    el: document.getElementById(l.dataset.nav),
-  })).filter(s => s.el);
-
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(e => {
-      const s = sections.find(s => s.el === e.target);
-      if (s) s.link.classList.toggle('active', e.isIntersecting);
-    });
-  }, { threshold: 0.05, rootMargin: '-40px 0px -55% 0px' });
-
-  sections.forEach(s => observer.observe(s.el));
-
-  // クリック時はスムーズスクロール
-  navLinks.forEach(link => {
-    link.addEventListener('click', e => {
-      const id = link.dataset.nav;
-      const target = document.getElementById(id);
-      if (!target) return;
-      e.preventDefault();
-      target.scrollIntoView({ behavior: 'smooth' });
-    });
-  });
-
   document.addEventListener('DOMContentLoaded', syncPresets);
 </script>
 {% endblock %}

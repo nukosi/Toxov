@@ -119,10 +119,9 @@
     .main {
       margin-left: var(--sw);
       flex: 1;
-      padding: 28px 32px;
+      padding: 32px 36px;
+      min-width: 0;
     }
-
-    .wrap { max-width: 580px; }
 
     /* ─── Cards ─── */
     .card {
@@ -250,9 +249,7 @@
   </aside>
 
   <main class="main">
-    <div class="wrap">
-      {% block content %}{% endblock %}
-    </div>
+    {% block content %}{% endblock %}
   </main>
 
   {% block scripts %}{% endblock %}
