@@ -200,11 +200,11 @@ def _migrate():
                 if first_user:
                     conn.execute(text("UPDATE sites SET user_id=:uid"), {"uid": first_user[0]})
                 conn.commit()
-        # ユーザー動向記録カラムを追加
+        # ユーザー動向記録カラムを追加（PostgreSQLはDATETIME非対応のためTIMESTAMPを使う）
         user_columns_now = [c["name"] for c in inspector.get_columns("users")]
         for col in ("registered_at", "first_save_at", "first_sync_at", "last_active_at"):
             if col not in user_columns_now:
-                conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} DATETIME"))
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} TIMESTAMP"))
         conn.commit()
 
 
