@@ -133,29 +133,31 @@ details > summary::-webkit-details-marker { display: none; }
 ═══════════════════════════════════════ -->
 <div id="tab-home" class="tab">
 
-  <!-- ステータス -->
-  <div class="card" style="margin-bottom:10px; display:flex; align-items:center; gap:10px;">
-    {% if config.emergency_unblock %}
-      <span class="dot dot-emerg"></span>
-      <span style="font-weight:600; color:var(--warning);">緊急解除中</span>
-    {% elif blocking %}
-      <span class="dot dot-block"></span>
-      <span style="font-weight:600; color:var(--danger);">ブロック中</span>
-      <span style="color:var(--dim); font-size:.82rem;">{{ config.block_start }} ～ {{ config.block_end }}</span>
-    {% else %}
-      <span class="dot dot-free"></span>
-      <span style="font-weight:600; color:var(--success);">解除中</span>
-      <span style="color:var(--dim); font-size:.82rem;">{{ config.block_start }} ～ {{ config.block_end }}</span>
-    {% endif %}
-  </div>
-
-  <!-- ストリーク -->
-  <div class="card" style="text-align:center; padding:32px 20px; margin-bottom:10px;">
-    <div style="font-size:2.2rem; margin-bottom:8px;">{{ semoji }}</div>
-    <div style="font-size:3rem; font-weight:700; letter-spacing:-2px; line-height:1;">
-      {{ streak }}<span style="font-size:1.1rem; font-weight:400; color:var(--muted); margin-left:6px;">日連続</span>
+  <!-- ヒーローカード：ストリーク ＋ ステータス -->
+  <div class="card" style="padding:28px 28px 24px; margin-bottom:10px;">
+    <!-- ストリーク -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:1.6rem; margin-bottom:6px;">{{ semoji }}</div>
+      <div style="font-size:3.4rem; font-weight:700; letter-spacing:-2px; line-height:1;">
+        {{ streak }}<span style="font-size:1.1rem; font-weight:400; color:var(--muted); margin-left:7px;">日連続</span>
+      </div>
+      <div style="font-size:.84rem; color:var(--dim); margin-top:8px;">{{ comment }}</div>
     </div>
-    <div style="font-size:.85rem; color:var(--dim); margin-top:10px;">{{ comment }}</div>
+    <!-- ステータス＋スケジュール -->
+    <div style="border-top:1px solid var(--border); padding-top:18px; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;">
+      {% if config.emergency_unblock %}
+        <span class="dot dot-emerg" style="margin-top:3px; flex-shrink:0;"></span>
+        <span style="font-size:1.3rem; font-weight:700; color:var(--warning);">緊急解除中</span>
+      {% elif blocking %}
+        <span class="dot dot-block" style="margin-top:3px; flex-shrink:0;"></span>
+        <span style="font-size:1.3rem; font-weight:700; color:var(--danger);">ブロック中</span>
+        <span style="font-size:1.1rem; font-weight:500; color:var(--muted); letter-spacing:.5px;">{{ config.block_start }} ～ {{ config.block_end }}</span>
+      {% else %}
+        <span class="dot dot-free" style="margin-top:3px; flex-shrink:0;"></span>
+        <span style="font-size:1.3rem; font-weight:700; color:var(--success);">解除中</span>
+        <span style="font-size:1.1rem; font-weight:500; color:var(--muted); letter-spacing:.5px;">{{ config.block_start }} ～ {{ config.block_end }}</span>
+      {% endif %}
+    </div>
   </div>
 
   <!-- 継続率 ＋ ポイント -->
@@ -206,34 +208,32 @@ details > summary::-webkit-details-marker { display: none; }
     </div>
   </div>
 
-  <!-- 緊急解除 ＋ PC連携 -->
-  <div class="home-grid-2">
-    <!-- 緊急解除 -->
-    <div class="card" style="margin-bottom:0;">
-      <div class="card-label">緊急解除</div>
-      {% if config.emergency_unblock %}
-        <p style="font-size:.82rem; color:var(--warning); margin-bottom:10px;">現在緊急解除中です</p>
-        <form action="/resume" method="post">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn btn-success btn-full">ブロックを再開する</button>
-        </form>
-      {% else %}
-        <p style="font-size:.82rem; color:var(--dim); margin-bottom:10px;">ブロック時間中に一時的に解除します</p>
-        <form action="/emergency" method="post">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn btn-danger btn-full">緊急解除</button>
-        </form>
-      {% endif %}
-    </div>
-    <!-- PC連携 -->
-    <div class="card" style="margin-bottom:0;">
+  <!-- 緊急解除 -->
+  <div class="card">
+    <div class="card-label">緊急解除</div>
+    {% if config.emergency_unblock %}
+      <p style="font-size:.82rem; color:var(--warning); margin-bottom:10px;">現在緊急解除中です</p>
+      <form action="/resume" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-ghost">ブロックを再開する</button>
+      </form>
+    {% else %}
+      <p style="font-size:.82rem; color:var(--dim); margin-bottom:10px;">ブロック時間中に一時的に解除します（最終手段）</p>
+      <form action="/emergency" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-ghost">緊急解除</button>
+      </form>
+    {% endif %}
+  </div>
+
+  <!-- PC連携 -->
+  <div class="card" style="margin-bottom:0;">
       <div class="card-label">PC連携コード</div>
       <p style="font-size:.8rem; color:var(--muted); margin-bottom:12px;">Toxov.exe を起動してこのコードを入力</p>
       <div style="text-align:center; background:var(--bg-input); border-radius:var(--rs); padding:14px;
                   letter-spacing:6px; font-size:1.6rem; font-weight:700; color:var(--accent); font-family:monospace;">
         {{ connect_code }}
       </div>
-    </div>
   </div>
 
 </div><!-- /tab-home -->
