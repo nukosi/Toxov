@@ -114,53 +114,56 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="tab-home" class="tab">
 
   <!-- ヒーロー -->
-  <div style="text-align:center; padding:56px 28px 32px;">
+  <div style="text-align:center; padding:72px 28px 48px;">
     <!-- ステータスラベル -->
-    <div style="font-size:.68rem; text-transform:uppercase; letter-spacing:2.5px; font-weight:600; margin-bottom:24px;
+    <div style="font-size:1.25rem; font-weight:700; letter-spacing:.5px; margin-bottom:32px;
       color:{% if config.emergency_unblock %}var(--warning){% elif blocking %}var(--accent){% else %}var(--dim){% endif %};">
       {% if config.emergency_unblock %}緊急解除中{% elif blocking %}ブロック中{% else %}解除中{% endif %}
     </div>
     <!-- ストリーク数字 -->
     <div style="font-size:7.5rem; font-weight:800; letter-spacing:-6px; line-height:1; color:var(--text);">{{ streak }}</div>
-    <div style="font-size:.95rem; color:var(--muted); margin-top:12px; letter-spacing:.3px;">日連続</div>
+    <div style="font-size:.88rem; color:var(--dim); margin-top:18px; letter-spacing:.5px;">日連続</div>
     <!-- スケジュール -->
-    <div style="font-size:.9rem; color:var(--dim); margin-top:14px; letter-spacing:.8px;">{{ config.block_start }} — {{ config.block_end }}</div>
+    <div style="font-size:.88rem; color:var(--dim); margin-top:22px; letter-spacing:.8px;">{{ config.block_start }} — {{ config.block_end }}</div>
     <!-- コメント -->
-    <div style="font-size:.76rem; color:var(--dim); margin-top:10px;">{{ comment }}</div>
+    <div style="font-size:.76rem; color:var(--dim); margin-top:12px;">{{ comment }}</div>
   </div>
 
-  <!-- 統計（横並び1枚カード） -->
-  <div class="card" style="display:grid; grid-template-columns:repeat(4,1fr); text-align:center; padding:0; overflow:hidden; margin-bottom:10px;">
-    <div style="padding:18px 10px; border-right:1px solid var(--border);">
-      <div style="font-size:.62rem; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:10px;">今週</div>
-      {% if weekly_rate.rate is not none %}
-        <div style="font-size:1.15rem; font-weight:700; color:var(--text);">{{ weekly_rate.success }}/{{ weekly_rate.total }}</div>
-        <div style="font-size:.68rem; color:var(--dim); margin-top:3px;">日</div>
-      {% else %}
-        <div style="font-size:1.15rem; color:var(--dim);">—</div>
-      {% endif %}
-    </div>
-    <div style="padding:18px 10px; border-right:1px solid var(--border);">
-      <div style="font-size:.62rem; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:10px;">今月</div>
-      {% if monthly_rate.rate is not none %}
-        <div style="font-size:1.15rem; font-weight:700; color:var(--text);">{{ monthly_rate.success }}/{{ monthly_rate.total }}</div>
-        <div style="font-size:.68rem; color:var(--dim); margin-top:3px;">日</div>
-      {% else %}
-        <div style="font-size:1.15rem; color:var(--dim);">—</div>
-      {% endif %}
-    </div>
-    <div style="padding:18px 10px; border-right:1px solid var(--border);">
-      <div style="font-size:.62rem; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:10px;">ランク</div>
-      <div style="font-size:1.15rem; font-weight:700; color:var(--text);">{{ rank.name }}</div>
-    </div>
-    <div style="padding:18px 10px;">
-      <div style="font-size:.62rem; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:10px;">次まで</div>
-      {% if rank.next %}
-        <div style="font-size:1.15rem; font-weight:700; color:var(--text);">{{ rank.pts_to_next }}</div>
-        <div style="font-size:.68rem; color:var(--dim); margin-top:3px;">pt</div>
-      {% else %}
-        <div style="font-size:.88rem; color:var(--accent);">MAX</div>
-      {% endif %}
+  <!-- 統計カード -->
+  <div class="card" style="padding:20px 24px; margin-bottom:10px;">
+    <div style="display:grid; grid-template-columns:1fr auto; align-items:center; gap:0;">
+      <!-- 左：今週・今月・総ポイント -->
+      <div style="display:flex; flex-direction:column; gap:14px; padding-right:28px; border-right:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+          <span style="font-size:.72rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted);">今週</span>
+          {% if weekly_rate.rate is not none %}
+            <span style="font-size:1rem; font-weight:700; color:var(--text);">{{ weekly_rate.success }}<span style="font-size:.72rem; color:var(--dim); font-weight:400;"> / {{ weekly_rate.total }}日</span></span>
+          {% else %}
+            <span style="font-size:1rem; color:var(--dim);">—</span>
+          {% endif %}
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+          <span style="font-size:.72rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted);">今月</span>
+          {% if monthly_rate.rate is not none %}
+            <span style="font-size:1rem; font-weight:700; color:var(--text);">{{ monthly_rate.success }}<span style="font-size:.72rem; color:var(--dim); font-weight:400;"> / {{ monthly_rate.total }}日</span></span>
+          {% else %}
+            <span style="font-size:1rem; color:var(--dim);">—</span>
+          {% endif %}
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+          <span style="font-size:.72rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted);">総ポイント</span>
+          <span style="font-size:1rem; font-weight:700; color:var(--text);">{{ points.lifetime_points }}<span style="font-size:.72rem; color:var(--dim); font-weight:400;">pt</span></span>
+        </div>
+      </div>
+      <!-- 右：ランク -->
+      <div style="padding-left:28px; text-align:center;">
+        <div style="font-size:1.4rem; font-weight:700; color:var(--text); margin-bottom:8px;">{{ rank.name }}</div>
+        {% if rank.next %}
+          <div style="font-size:.68rem; color:var(--dim); white-space:nowrap;">次のランクまで {{ rank.pts_to_next }}pt</div>
+        {% else %}
+          <div style="font-size:.68rem; color:var(--accent);">最高ランク</div>
+        {% endif %}
+      </div>
     </div>
   </div>
 
