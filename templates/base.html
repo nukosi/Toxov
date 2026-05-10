@@ -6,21 +6,21 @@
   <title>{% block title %}Toxov{% endblock %}</title>
   <style>
     :root {
-      --bg:        #0d0d0d;
-      --bg-card:   #141414;
-      --bg-input:  #1c1c1c;
-      --bg-hover:  #1f1f1f;
-      --border:    #242424;
-      --text:      #e4e4e4;
-      --muted:     #767676;
-      --dim:       #686868;
-      --accent:    #4dabf7;
-      --success:   #51cf66;
-      --warning:   #ffa94d;
-      --danger:    #ff6b6b;
+      --bg:        #0B0B0C;
+      --bg-card:   #111113;
+      --bg-input:  #1a1a1d;
+      --bg-hover:  #1a1a1d;
+      --border:    rgba(255,255,255,0.06);
+      --text:      #F4F4F5;
+      --muted:     #8A8A93;
+      --dim:       #6B6B74;
+      --accent:    #F97316;
+      --success:   #3DD68C;
+      --warning:   #F0A050;
+      --danger:    #E05252;
       --sw:        218px;
-      --r:         10px;
-      --rs:        7px;
+      --r:         20px;
+      --rs:        10px;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -86,7 +86,7 @@
     }
 
     .sb-link:hover { background: var(--bg-hover); color: var(--text); }
-    .sb-link.active { background: var(--bg-hover); color: var(--text); }
+    .sb-link.active { background: rgba(249,115,22,0.08); color: var(--text); }
     .sb-link svg { width: 15px; height: 15px; flex-shrink: 0; }
 
     .sb-foot {
@@ -228,11 +228,11 @@
       letter-spacing: .4px;
       vertical-align: middle;
     }
-    .rank-seed    { color:#888;    background:#141414; border-color:#2a2a2a; }
-    .rank-flame   { color:#ffa94d; background:#1e1500; border-color:#4a3400; }
-    .rank-iron    { color:#adb5bd; background:#141414; border-color:#3a3d40; }
-    .rank-gold    { color:#ffd43b; background:#1a1500; border-color:#4a3f00; }
-    .rank-diamond { color:#74c0fc; background:#091422; border-color:#143060; }
+    .rank-seed    { color:#888;    background:transparent; border-color:rgba(255,255,255,0.12); }
+    .rank-flame   { color:#ffa94d; background:transparent; border-color:rgba(255,169,77,0.25); }
+    .rank-iron    { color:#adb5bd; background:transparent; border-color:rgba(173,181,189,0.25); }
+    .rank-gold    { color:#ffd43b; background:transparent; border-color:rgba(255,212,59,0.25); }
+    .rank-diamond { color:#74c0fc; background:transparent; border-color:rgba(116,192,252,0.25); }
 
     {% block extra_style %}{% endblock %}
   </style>
