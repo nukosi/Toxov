@@ -217,10 +217,10 @@ details > summary::-webkit-details-marker { display: none; }
         <button type="submit" class="btn btn-ghost">ブロックを再開する</button>
       </form>
     {% else %}
-      <p style="font-size:.82rem; color:var(--dim); margin-bottom:10px;">ブロック時間中に一時的に解除します（最終手段）</p>
+      <p style="font-size:.82rem; color:var(--muted); margin-bottom:10px;">ブロック時間中に一時的に解除します（最終手段）</p>
       <form action="/emergency" method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-ghost">緊急解除</button>
+        <button type="submit" class="btn btn-ghost" style="border-color:#555; color:var(--muted);">緊急解除</button>
       </form>
     {% endif %}
   </div>
