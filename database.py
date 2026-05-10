@@ -31,6 +31,11 @@ class UserModel(Base):
     connect_code = Column(String, nullable=True, unique=True)
     # パスワードリセット用。登録時は任意
     email        = Column(String, nullable=True, unique=True)
+    # ユーザー動向記録
+    registered_at  = Column(DateTime, nullable=True)
+    first_save_at  = Column(DateTime, nullable=True)
+    first_sync_at  = Column(DateTime, nullable=True)
+    last_active_at = Column(DateTime, nullable=True)
     config    = relationship("Config", back_populates="user", uselist=False, cascade="all, delete-orphan")
     sites     = relationship("Site", back_populates="user", cascade="all, delete-orphan")
     apps      = relationship("App",  back_populates="user", cascade="all, delete-orphan")
@@ -195,9 +200,17 @@ def _migrate():
                 if first_user:
                     conn.execute(text("UPDATE sites SET user_id=:uid"), {"uid": first_user[0]})
                 conn.commit()
+        # ユーザー動向記録カラムを追加
+        user_columns_now = [c["name"] for c in inspector.get_columns("users")]
+        for col in ("registered_at", "first_save_at", "first_sync_at", "last_active_at"):
+            if col not in user_columns_now:
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} DATETIME"))
+        conn.commit()
 
 
 def create_user(username, password, email=None):
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now   = datetime.datetime.now(JST).replace(tzinfo=None)
     token = secrets.token_urlsafe(32)
     with Session(engine) as session:
         user = session.query(UserModel).filter_by(username=username).first()
@@ -214,6 +227,7 @@ def create_user(username, password, email=None):
                 role="admin" if is_first else "user",
                 connect_code=_generate_connect_code(),
                 email=email.lower().strip() if email else None,
+                registered_at=now,
             )
             session.add(user)
             session.flush()
@@ -560,6 +574,56 @@ def get_season_ranking(limit=10) -> list:
             .all()
         )
         return [{"username": r[0], "season_points": r[1], "lifetime_points": r[2]} for r in rows]
+
+
+def record_first_save(user_id: int):
+    """ブロック設定を初めて保存したタイミングを記録する。"""
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    with Session(engine) as session:
+        user = session.get(UserModel, user_id)
+        if user:
+            if user.first_save_at is None:
+                user.first_save_at = now
+            user.last_active_at = now
+            session.commit()
+
+
+def record_first_sync(user_id: int):
+    """エージェントが初めてconfigを取得したタイミングを記録する。"""
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    with Session(engine) as session:
+        user = session.get(UserModel, user_id)
+        if user:
+            if user.first_sync_at is None:
+                user.first_sync_at = now
+            user.last_active_at = now
+            session.commit()
+
+
+def get_analytics() -> dict:
+    """管理者用ダッシュボード向けにユーザー動向の集計値を返す。"""
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    with Session(engine) as session:
+        total  = session.query(UserModel).count()
+        saved  = session.query(UserModel).filter(UserModel.first_save_at.isnot(None)).count()
+        synced = session.query(UserModel).filter(UserModel.first_sync_at.isnot(None)).count()
+
+        def active_within(days: int) -> int:
+            since = now - datetime.timedelta(days=days)
+            return session.query(UserModel).filter(UserModel.last_active_at >= since).count()
+
+        return {
+            "total":      total,
+            "saved":      saved,
+            "synced":     synced,
+            "active_2d":  active_within(2),
+            "active_7d":  active_within(7),
+            "active_14d": active_within(14),
+            "active_30d": active_within(30),
+        }
 
 
 def add_app_to_config(user_id: int, path: str) -> bool:

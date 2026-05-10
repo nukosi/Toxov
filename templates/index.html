@@ -393,10 +393,67 @@ details > summary::-webkit-details-marker { display: none; }
 ═══════════════════════════════════════ -->
 {% if role == "admin" %}
 <div id="tab-admin" class="tab">
-  <div class="card" style="border-color:#1e1e3a;">
-    <div class="card-label" style="color:#6c7bd4;">開発者モード</div>
-    <p style="font-size:.84rem; color:var(--dim); margin-bottom:14px;">プランを切り替えて制限の動作を確認できます</p>
-    <div style="font-size:.84rem; color:var(--muted); margin-bottom:12px;">
+
+  <!-- ファネル -->
+  {% if analytics %}
+  <div class="card" style="margin-bottom:10px;">
+    <div class="card-label">ユーザーファネル</div>
+    {% set total = analytics.total %}
+    <div style="display:flex; flex-direction:column; gap:0;">
+
+      <!-- 登録 -->
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border);">
+        <span style="font-size:.82rem; color:var(--muted);">登録</span>
+        <span style="font-size:1rem; font-weight:700; color:var(--text);">{{ total }}<span style="font-size:.72rem; color:var(--dim); font-weight:400;"> 人</span></span>
+      </div>
+
+      <!-- 設定完了 -->
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border);">
+        <span style="font-size:.82rem; color:var(--muted);">ブロック設定を保存</span>
+        <span style="font-size:1rem; font-weight:700; color:var(--text);">
+          {{ analytics.saved }}<span style="font-size:.72rem; color:var(--dim); font-weight:400;"> 人</span>
+          <span style="font-size:.72rem; color:var(--dim); margin-left:8px;">
+            {% if total > 0 %}{{ (analytics.saved / total * 100)|round|int }}%{% else %}—{% endif %}
+          </span>
+        </span>
+      </div>
+
+      <!-- PC接続 -->
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0;">
+        <span style="font-size:.82rem; color:var(--muted);">PC接続成功</span>
+        <span style="font-size:1rem; font-weight:700; color:var(--text);">
+          {{ analytics.synced }}<span style="font-size:.72rem; color:var(--dim); font-weight:400;"> 人</span>
+          <span style="font-size:.72rem; color:var(--dim); margin-left:8px;">
+            {% if total > 0 %}{{ (analytics.synced / total * 100)|round|int }}%{% else %}—{% endif %}
+          </span>
+        </span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 継続利用 -->
+  <div class="card" style="margin-bottom:10px;">
+    <div class="card-label">継続利用（直近N日以内にアクティブ）</div>
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); text-align:center; padding:4px 0;">
+      {% for label, val in [("2日", analytics.active_2d), ("7日", analytics.active_7d), ("14日", analytics.active_14d), ("30日", analytics.active_30d)] %}
+      <div style="padding:12px 8px; {% if not loop.last %}border-right:1px solid var(--border);{% endif %}">
+        <div style="font-size:.62rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:8px;">{{ label }}</div>
+        <div style="font-size:1.1rem; font-weight:700; color:var(--text);">{{ val }}</div>
+        <div style="font-size:.68rem; color:var(--dim); margin-top:3px;">
+          {% if analytics.total > 0 %}{{ (val / analytics.total * 100)|round|int }}%{% else %}—{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- プラン切り替え -->
+  <div class="card">
+    <div class="card-label">開発者モード</div>
+    <p style="font-size:.82rem; color:var(--dim); margin-bottom:14px;">プランを切り替えて制限の動作を確認できます</p>
+    <div style="font-size:.82rem; color:var(--muted); margin-bottom:12px;">
       現在のプラン: <strong style="color:{% if plan == 'premium' %}var(--warning){% else %}var(--text){% endif %};">{{ plan }}</strong>
     </div>
     <div style="display:flex; gap:8px; max-width:300px;">
@@ -414,6 +471,7 @@ details > summary::-webkit-details-marker { display: none; }
       </form>
     </div>
   </div>
+
 </div>
 {% endif %}
 

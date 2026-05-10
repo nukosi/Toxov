@@ -13,7 +13,7 @@ from database import (init_db, load_config, save_config,
                       apply_event_points, get_user_points, get_season_ranking, get_rank,
                       get_user_by_connect_code, get_user_by_email, set_user_email,
                       create_reset_token, verify_reset_token, consume_reset_token, update_password,
-                      add_app_to_config)
+                      add_app_to_config, record_first_save, record_first_sync, get_analytics)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 from mailer import send_password_reset
@@ -201,7 +201,8 @@ def index():
     ranking      = get_season_ranking()
     for r in ranking:
         r["rank"] = get_rank(r["season_points"])
-    limits   = get_limits(current_user.plan)
+    limits    = get_limits(current_user.plan)
+    analytics = get_analytics() if current_user.role == "admin" else None
     return render_template("index.html", config=config, blocking=blocking,
                            saved=saved, api_token=current_user.api_token,
                            connect_code=current_user.connect_code,
@@ -209,7 +210,8 @@ def index():
                            weekly_rate=weekly_rate, monthly_rate=monthly_rate,
                            points=points, rank=rank, ranking=ranking, error=error,
                            plan=current_user.plan, limits=limits,
-                           role=current_user.role, presets=PRESET_SITES)
+                           role=current_user.role, presets=PRESET_SITES,
+                           analytics=analytics)
 
 
 @app.route("/save", methods=["POST"])
@@ -243,6 +245,7 @@ def save():
         return redirect(url_for("index", error="app_limit"))
 
     save_config(current_user.id, block_start, block_end, sites, apps)
+    record_first_save(current_user.id)
     return redirect(url_for("index", saved=1))
 
 
@@ -293,6 +296,7 @@ def api_config(token):
     user = get_user_by_token(token)
     if not user:
         return jsonify({"error": "invalid token"}), 401
+    record_first_sync(user["id"])
     # streakをconfig APIに含めることでモバイルアプリからも参照できるようにする
     config = load_config(user["id"])
     config["streak"] = get_streak(user["id"])
