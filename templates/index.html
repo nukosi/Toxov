@@ -86,14 +86,14 @@
 .preset-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
+  gap: 7px;
+  padding: 9px 14px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--rs);
   cursor: pointer;
   color: var(--muted);
-  font-size: .78rem;
+  font-size: .88rem;
   font-weight: 500;
   font-family: inherit;
   transition: border-color .12s, color .12s, background .12s;
@@ -278,7 +278,7 @@ details > summary::-webkit-details-marker { display: none; }
             {% for site in cat.sites %}
             <button type="button" class="preset-btn" data-domains="{{ site.domains|join(',') }}" onclick="togglePreset(this)">
               <img src="https://www.google.com/s2/favicons?domain={{ site.domains[0] }}&sz=32"
-                   width="16" height="16" style="border-radius:3px;" loading="lazy"
+                   width="22" height="22" style="border-radius:4px;" loading="lazy"
                    onerror="this.src='https://icons.duckduckgo.com/ip3/{{ site.domains[0] }}.ico';this.onerror=null;">
               {{ site.name }}
             </button>
@@ -293,14 +293,14 @@ details > summary::-webkit-details-marker { display: none; }
           {% for cat in presets %}{% if cat.collapsed %}{% for site in cat.sites %}
           <button type="button" class="preset-btn" data-domains="{{ site.domains|join(',') }}" onclick="togglePreset(this)">
             <img src="https://www.google.com/s2/favicons?domain={{ site.domains[0] }}&sz=32"
-                 width="16" height="16" style="border-radius:3px;" loading="lazy">
+                 width="22" height="22" style="border-radius:4px;" loading="lazy">
             {{ site.name }}
           </button>
           {% endfor %}{% endif %}{% endfor %}
         </div>
       </details>
 
-      <textarea id="sites-ta" name="sites" style="height:120px; text-align:left;">{{ config.sites|join('\n') }}</textarea>
+      <textarea id="sites-ta" name="sites" style="height:72px; text-align:left;">{{ config.sites|join('\n') }}</textarea>
       <p class="hint" style="color:var(--muted);">1行に1サイト（例: instagram.com）</p>
       {% if blocking %}<p class="lock-note">ブロック時間中は削除できません（追加のみ可）</p>{% endif %}
     </div>
@@ -319,7 +319,7 @@ details > summary::-webkit-details-marker { display: none; }
     </div>
 
     <div style="text-align:center; margin-top:4px;">
-      <button type="submit" class="btn btn-primary">設定を保存</button>
+      <button type="submit" class="btn btn-primary" style="padding:14px 48px; font-size:1rem;">設定を保存</button>
     </div>
   </form>
 
