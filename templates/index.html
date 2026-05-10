@@ -26,6 +26,12 @@
     <rect x="11" y="2"  width="4" height="13" rx=".5"/>
   </svg>
   ランキング
+  {% if plan == 'free' %}
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;margin-left:auto;opacity:.4;">
+    <rect x="3" y="7" width="10" height="8" rx="1.5"/>
+    <path d="M5 7V5a3 3 0 016 0v2"/>
+  </svg>
+  {% endif %}
 </a>
 <a href="#" class="sb-link" data-tab="log">
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
@@ -289,6 +295,51 @@ details > summary::-webkit-details-marker { display: none; }
      ランキング
 ═══════════════════════════════════════ -->
 <div id="tab-ranking" class="tab">
+
+  {% if plan == 'free' %}
+  <!-- 無料ユーザー：Premium案内 -->
+  <div class="card" style="text-align:center; padding:48px 28px;">
+    <div style="font-size:.68rem; text-transform:uppercase; letter-spacing:2px; color:var(--muted); margin-bottom:20px;">Premium</div>
+    <div style="font-size:1.3rem; font-weight:700; color:var(--text); margin-bottom:12px;">ランキングに参加する</div>
+    <div style="font-size:.84rem; color:var(--dim); line-height:1.8; margin-bottom:28px;">
+      他のユーザーと継続日数・ポイントを競えます。<br>
+      自分が全体の何%にいるかも確認できます。
+    </div>
+    <div style="font-size:.78rem; color:var(--muted);">Premium プランで利用可能</div>
+  </div>
+
+  <!-- 自分のポイントは無料でも見える -->
+  <div class="card">
+    <div class="card-label">自分のポイント</div>
+    <div style="display:grid; grid-template-columns:1fr 1px 1fr; margin-bottom:16px;">
+      <div style="text-align:center; padding:0 16px;">
+        <div style="font-size:.76rem; color:var(--muted); margin-bottom:6px;">シーズン</div>
+        <div style="font-size:2rem; font-weight:700; color:var(--accent);">{{ points.season_points }}</div>
+        <div style="font-size:.74rem; color:var(--dim);">pt</div>
+      </div>
+      <div style="background:var(--border);"></div>
+      <div style="text-align:center; padding:0 16px;">
+        <div style="font-size:.76rem; color:var(--muted); margin-bottom:6px;">通算</div>
+        <div style="font-size:2rem; font-weight:700; color:var(--muted);">{{ points.lifetime_points }}</div>
+        <div style="font-size:.74rem; color:var(--dim);">pt</div>
+      </div>
+    </div>
+    {% if rank.next %}
+      <div style="display:flex; justify-content:space-between; font-size:.76rem; color:var(--dim); margin-bottom:7px;">
+        <span>現在: <strong style="color:var(--text);">{{ rank.name }}</strong></span>
+        <span>次: <strong>{{ rank.next }}</strong> まで {{ rank.pts_to_next }}pt</span>
+      </div>
+      <div style="background:var(--bg-input); border-radius:4px; height:4px; overflow:hidden;">
+        <div style="height:4px; width:{{ rank.progress }}%; border-radius:4px;
+          background:{% if rank.next == 'Flame' %}var(--warning){% elif rank.next == 'Iron' %}#adb5bd{% elif rank.next == 'Gold' %}#ffd43b{% else %}var(--accent){% endif %};"></div>
+      </div>
+    {% else %}
+      <div style="text-align:center; font-size:.8rem; color:var(--accent);">最高ランク達成</div>
+    {% endif %}
+  </div>
+
+  {% else %}
+  <!-- Premium ユーザー：ランキング表示 -->
   <div class="card">
     <div class="card-label">シーズンランキング</div>
     {% if ranking %}
@@ -349,6 +400,7 @@ details > summary::-webkit-details-marker { display: none; }
       <div style="text-align:center; font-size:.8rem; color:var(--accent);">最高ランク達成</div>
     {% endif %}
   </div>
+  {% endif %}
 
 </div><!-- /tab-ranking -->
 
