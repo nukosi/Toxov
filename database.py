@@ -335,25 +335,35 @@ def get_event_logs(user_id, limit=30):
 
 def get_success_rate(user_id, days: int) -> dict:
     JST = datetime.timezone(datetime.timedelta(hours=9))
-    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    now   = datetime.datetime.now(JST).replace(tzinfo=None)
     since = now - datetime.timedelta(days=days)
     with Session(engine) as session:
-        logs = (
+        # 計測開始点: 初回block_startとsinceの遅い方（使い始めより前は数えない）
+        first_block = (
             session.query(EventLog)
-            .filter(EventLog.user_id == user_id, EventLog.created_at >= since)
+            .filter_by(user_id=user_id, event="block_start")
+            .order_by(EventLog.id.asc())
+            .first()
+        )
+        if not first_block:
+            return {"rate": None, "success": 0, "total": 0}
+        window_start = max(since, first_block.created_at)
+        # 経過日数（今日は未完了のため含めない）
+        total = (now.date() - window_start.date()).days
+        if total <= 0:
+            return {"rate": None, "success": 0, "total": 0}
+        # 緊急解除があった日を失敗としてカウントする
+        emergency_logs = (
+            session.query(EventLog)
+            .filter(
+                EventLog.user_id == user_id,
+                EventLog.event == "emergency_unblock",
+                EventLog.created_at >= window_start,
+            )
             .all()
         )
-    # 日ごとにブロックがあった日・緊急解除があった日を集計する
-    days_with_block     = set()
-    days_with_emergency = set()
-    for log in logs:
-        day = log.created_at.date()
-        if log.event == "block_start":
-            days_with_block.add(day)
-        elif log.event == "emergency_unblock":
-            days_with_emergency.add(day)
-    total   = len(days_with_block)
-    success = len(days_with_block - days_with_emergency)
+    failure = len({log.created_at.date() for log in emergency_logs})
+    success = max(0, total - failure)
     rate    = round(success / total * 100) if total > 0 else None
     return {"rate": rate, "success": success, "total": total}
 
