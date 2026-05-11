@@ -443,7 +443,7 @@ def billing_checkout():
         "subscription_data": {"trial_period_days": 7},
         # WebhookでユーザーIDを特定するためにclient_reference_idを使う
         "client_reference_id": str(current_user.id),
-        "success_url": url_for("billing_success", _external=True),
+        "success_url": url_for("billing_success", _external=True) + "?session_id={CHECKOUT_SESSION_ID}",
         "cancel_url":  url_for("index", _external=True),
     }
     # 既存のStripeカスタマーIDがあれば再利用する（重複カスタマー防止）
@@ -458,7 +458,22 @@ def billing_checkout():
 @app.route("/billing/success")
 @login_required
 def billing_success():
-    # Stripeの決済完了後のリダイレクト先。Webhookが非同期で届くため即時反映は保証できない
+    # StripeのCheckout SessionをAPIで直接取得してプランを即時反映する（Webhookの遅延・失敗への対策）
+    session_id = request.args.get("session_id")
+    if session_id and STRIPE_SECRET_KEY:
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+            if session.get("payment_status") in ("paid", "no_payment_required"):
+                user_id = int(session.get("client_reference_id") or 0)
+                if user_id == current_user.id:
+                    set_stripe_subscription(
+                        user_id,
+                        customer_id     = session.get("customer"),
+                        subscription_id = session.get("subscription"),
+                        plan            = "premium",
+                    )
+        except Exception:
+            pass
     return redirect(url_for("index", payment="success"))
 
 
