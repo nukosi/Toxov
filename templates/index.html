@@ -763,6 +763,10 @@ details > summary::-webkit-details-marker { display: none; }
   const savedTab = sessionStorage.getItem('toxov-tab') || 'home';
   const initialTab = {% if error %}"settings"{% elif saved %}"home"{% else %}savedTab{% endif %};
   showTab(initialTab);
+  // URLからクエリパラメータを削除してリロード時に再表示されないようにする
+  if ({{ 'true' if saved or error or payment else 'false' }}) {
+    history.replaceState({}, '', '/');
+  }
 
   // ─── プリセット ───
   function getTA() {
