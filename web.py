@@ -427,6 +427,16 @@ def download():
     return send_from_directory("dist", "Toxov.exe", as_attachment=True)
 
 
+@app.route("/tokusho")
+def tokusho():
+    return render_template("tokusho.html")
+
+
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+
 @app.route("/billing/checkout", methods=["POST"])
 @login_required
 def billing_checkout():
