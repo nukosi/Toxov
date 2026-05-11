@@ -624,9 +624,11 @@ details > summary::-webkit-details-marker { display: none; }
             <td style="padding:9px 0; font-weight:500; color:
               {% if l.event == 'block_start' %}var(--danger)
               {% elif l.event == 'block_end' %}var(--success)
+              {% elif l.event == 'shield_used' %}var(--accent)
               {% else %}var(--warning){% endif %};">
               {% if l.event == 'block_start' %}ブロック開始
               {% elif l.event == 'block_end' %}ブロック終了
+              {% elif l.event == 'shield_used' %}🛡 シールド使用
               {% else %}緊急解除{% endif %}
             </td>
           </tr>
