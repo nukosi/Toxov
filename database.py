@@ -41,6 +41,9 @@ class UserModel(Base):
     stripe_subscription_id = Column(String, nullable=True)
     trial_ends_at          = Column(DateTime, nullable=True)
     plan_expires_at        = Column(DateTime, nullable=True)
+    # ストリーク保護シールド（Premium月次配布・持越しなし）
+    streak_shield       = Column(Integer, nullable=True, default=0)
+    shield_refreshed_at = Column(DateTime, nullable=True)
     config    = relationship("Config", back_populates="user", uselist=False, cascade="all, delete-orphan")
     sites     = relationship("Site", back_populates="user", cascade="all, delete-orphan")
     apps      = relationship("App",  back_populates="user", cascade="all, delete-orphan")
@@ -219,6 +222,13 @@ def _migrate():
         for col in ("trial_ends_at", "plan_expires_at"):
             if col not in user_columns_now:
                 conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} TIMESTAMP"))
+        conn.commit()
+        # ストリーク保護シールドカラムを追加
+        user_columns_now = [c["name"] for c in inspector.get_columns("users")]
+        if "streak_shield" not in user_columns_now:
+            conn.execute(text("ALTER TABLE users ADD COLUMN streak_shield INTEGER DEFAULT 0"))
+        if "shield_refreshed_at" not in user_columns_now:
+            conn.execute(text("ALTER TABLE users ADD COLUMN shield_refreshed_at TIMESTAMP"))
         conn.commit()
 
 
@@ -689,6 +699,44 @@ def get_user_by_stripe_customer_id(customer_id: str):
     with Session(engine) as session:
         user = session.query(UserModel).filter_by(stripe_customer_id=customer_id).first()
         return {"id": user.id} if user else None
+
+
+def get_streak_shield(user_id: int) -> int:
+    """シールド枚数を返す。月が変わっていれば1にリセット（premiumのみ）。"""
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    with Session(engine) as session:
+        user = session.get(UserModel, user_id)
+        if not user or user.plan != "premium":
+            return 0
+        refreshed_at = user.shield_refreshed_at
+        if refreshed_at is None or (refreshed_at.year, refreshed_at.month) != (now.year, now.month):
+            user.streak_shield = 1
+            user.shield_refreshed_at = now
+            session.commit()
+            return 1
+        return user.streak_shield or 0
+
+
+def use_streak_shield(user_id: int) -> bool:
+    """シールドを1枚消費する。成功したらTrueを返す。"""
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    with Session(engine) as session:
+        user = session.get(UserModel, user_id)
+        if not user or user.plan != "premium":
+            return False
+        refreshed_at = user.shield_refreshed_at
+        if refreshed_at is None or (refreshed_at.year, refreshed_at.month) != (now.year, now.month):
+            user.streak_shield = 1
+            user.shield_refreshed_at = now
+        current = user.streak_shield or 0
+        if current <= 0:
+            session.commit()
+            return False
+        user.streak_shield = current - 1
+        session.commit()
+        return True
 
 
 def save_config(user_id, block_start, block_end, sites, apps=None):

@@ -1,7 +1,7 @@
 # プランごとの機能制限を一元管理する。課金機能追加時はここだけ変える
 LIMITS = {
-    'free':    {'max_sites': 3, 'max_apps': 1},
-    'premium': {'max_sites': None, 'max_apps': None},
+    'free':    {'max_sites': 3, 'max_apps': 1, 'block_time_add': False},
+    'premium': {'max_sites': None, 'max_apps': None, 'block_time_add': True},
 }
 
 

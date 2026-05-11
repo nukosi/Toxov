@@ -117,7 +117,9 @@ details > summary::-webkit-details-marker { display: none; }
     <div class="banner banner-ok">決済が完了しました。Premiumプランへようこそ！（反映まで数秒かかる場合があります）</div>
   {% endif %}
   {% if error == "blocking" %}
-    <div class="banner banner-err">ブロック時間中はスケジュール変更・削除はできません</div>
+    <div class="banner banner-err">ブロック時間中は削除・スケジュール変更はできません</div>
+  {% elif error == "blocking_free" %}
+    <div class="banner banner-err">ブロック時間中は変更できません（Premiumで追加のみ解禁）</div>
   {% elif error == "site_limit" %}
     <div class="banner banner-err">無料プランではサイトを{{ limits.max_sites }}件まで登録できます</div>
   {% elif error == "app_limit" %}
@@ -202,6 +204,27 @@ details > summary::-webkit-details-marker { display: none; }
       {% endif %}
     </div>
   </div>
+
+  <!-- ストリーク保護シールド（Premiumのみ） -->
+  {% if plan == 'premium' %}
+  <div class="card" style="padding:14px 18px; margin-bottom:10px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <div style="font-size:.78rem; font-weight:600; color:var(--muted); margin-bottom:3px;">ストリーク保護シールド</div>
+        <div style="font-size:.72rem; color:var(--dim);">
+          {% if streak_shield > 0 %}
+            緊急解除1回をなかったことにします（毎月リセット）
+          {% else %}
+            今月分は使用済みです（来月1日にリセット）
+          {% endif %}
+        </div>
+      </div>
+      <div style="font-size:1.6rem; font-weight:700; color:{% if streak_shield > 0 %}var(--accent){% else %}var(--dim){% endif %}; flex-shrink:0; min-width:40px; text-align:right;">
+        🛡 {{ streak_shield }}
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- PC連携 -->
   <div class="card" style="padding:14px 18px; margin-bottom:0;">
@@ -294,7 +317,13 @@ details > summary::-webkit-details-marker { display: none; }
 
       <textarea id="sites-ta" name="sites" style="height:72px; text-align:left;">{{ config.sites|join('\n') }}</textarea>
       <p class="hint" style="color:var(--muted);">1行に1サイト（例: instagram.com）</p>
-      {% if blocking %}<p class="lock-note">ブロック時間中は削除できません（追加のみ可）</p>{% endif %}
+      {% if blocking %}
+        {% if limits.block_time_add %}
+          <p class="lock-note">ブロック時間中は削除できません（追加のみ可）</p>
+        {% else %}
+          <p class="lock-note">ブロック時間中は変更できません</p>
+        {% endif %}
+      {% endif %}
     </div>
 
     <!-- アプリ -->
@@ -307,7 +336,13 @@ details > summary::-webkit-details-marker { display: none; }
       </div>
       <textarea name="apps" style="height:100px;">{{ config.apps|join('\n') }}</textarea>
       <p class="hint" style="color:var(--muted);">1行に1つ、実行ファイルのフルパス（例: C:\...\game.exe）</p>
-      {% if blocking %}<p class="lock-note">ブロック時間中は削除できません（追加のみ可）</p>{% endif %}
+      {% if blocking %}
+        {% if limits.block_time_add %}
+          <p class="lock-note">ブロック時間中は削除できません（追加のみ可）</p>
+        {% else %}
+          <p class="lock-note">ブロック時間中は変更できません</p>
+        {% endif %}
+      {% endif %}
     </div>
 
     <div style="text-align:center; margin-top:4px;">
@@ -492,7 +527,7 @@ details > summary::-webkit-details-marker { display: none; }
     {% endfor %}
     <div style="border-top:1px solid var(--border); margin:12px 0 10px;"></div>
     <div style="font-size:.72rem; text-transform:uppercase; letter-spacing:1px; color:var(--accent); margin-bottom:10px;">Premiumのみ</div>
-    {% for item in ["シーズンランキング参加・閲覧", "自分の上位X%表示"] %}
+    {% for item in ["シーズンランキング参加・閲覧", "ブロック時間中のサイト・アプリ追加", "ストリーク保護シールド（月1枚）"] %}
     <div style="display:flex; align-items:center; gap:8px; padding:5px 0; font-size:.84rem; color:var(--dim);">
       <span style="color:var(--accent); font-size:1rem;">★</span> {{ item }}
     </div>
@@ -645,6 +680,7 @@ details > summary::-webkit-details-marker { display: none; }
 {% block scripts %}
 <script>
   const BLOCKING = {{ 'true' if blocking else 'false' }};
+  const CAN_ADD_DURING_BLOCK = {{ 'true' if limits.block_time_add else 'false' }};
 
   // ─── タブ切り替え ───
   function showTab(name) {
@@ -687,9 +723,10 @@ details > summary::-webkit-details-marker { display: none; }
     const cur = getTA();
     const allIn = domains.every(d => cur.includes(d));
     if (allIn) {
-      if (BLOCKING) return;
+      if (BLOCKING) return;  // 削除: ブロック中は全プランで不可
       setTA(cur.filter(d => !domains.includes(d)));
     } else {
+      if (BLOCKING && !CAN_ADD_DURING_BLOCK) return;  // 追加: 無料はブロック中不可
       setTA([...cur, ...domains.filter(d => !cur.includes(d))]);
     }
     syncPresets();

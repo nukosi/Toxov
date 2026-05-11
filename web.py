@@ -15,7 +15,8 @@ from database import (init_db, load_config, save_config,
                       get_user_by_connect_code, get_user_by_email, set_user_email,
                       create_reset_token, verify_reset_token, consume_reset_token, update_password,
                       add_app_to_config, record_first_save, record_first_sync, get_analytics,
-                      set_stripe_subscription, get_user_by_stripe_customer_id)
+                      set_stripe_subscription, get_user_by_stripe_customer_id,
+                      get_streak_shield, use_streak_shield)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 from mailer import send_password_reset
@@ -212,7 +213,8 @@ def index():
     ranking      = get_season_ranking()
     for r in ranking:
         r["rank"] = get_rank(r["season_points"])
-    limits    = get_limits(current_user.plan)
+    limits        = get_limits(current_user.plan)
+    streak_shield = get_streak_shield(current_user.id)
     analytics = get_analytics() if current_user.role == "admin" else None
     # エージェントが直近90秒以内にpollしていれば接続中とみなす（poll間隔30秒の3倍）
     user_data       = get_user_by_id(current_user.id)
@@ -229,6 +231,7 @@ def index():
                            weekly_rate=weekly_rate, monthly_rate=monthly_rate,
                            points=points, rank=rank, ranking=ranking, error=error,
                            plan=current_user.plan, limits=limits,
+                           streak_shield=streak_shield,
                            role=current_user.role, presets=PRESET_SITES,
                            analytics=analytics, agent_connected=agent_connected,
                            payment=request.args.get("payment"),
@@ -252,15 +255,22 @@ def save():
     blocking = is_blocking_time(config)
 
     if blocking:
-        # ブロック時間中はスケジュール変更不可
+        # ブロック時間中はスケジュール変更不可（全プラン共通）
         if block_start != config["block_start"] or block_end != config["block_end"]:
             return redirect(url_for("index", error="blocking"))
-        # ブロック時間中はサイト削除不可（追加のみ許可）
-        if not set(config["sites"]).issubset(set(sites)):
-            return redirect(url_for("index", error="blocking"))
-        # ブロック時間中はアプリ削除不可（追加のみ許可）
-        if not set(config["apps"]).issubset(set(apps)):
-            return redirect(url_for("index", error="blocking"))
+        limits = get_limits(current_user.plan)
+        if limits['block_time_add']:
+            # Premium: 追加のみ許可（既存サイト・アプリの削除は不可）
+            if not set(config["sites"]).issubset(set(sites)):
+                return redirect(url_for("index", error="blocking"))
+            if not set(config["apps"]).issubset(set(apps)):
+                return redirect(url_for("index", error="blocking"))
+        else:
+            # 無料: 追加も削除も不可（完全ロック）
+            if set(sites) != set(config["sites"]):
+                return redirect(url_for("index", error="blocking_free"))
+            if set(apps) != set(config["apps"]):
+                return redirect(url_for("index", error="blocking_free"))
 
     # プランの上限チェック
     if not within_site_limit(current_user.plan, len(sites)):
@@ -361,6 +371,11 @@ def api_log(token):
     event = body.get("event")
     # 想定外の値がDBに入らないよう許可リストで絞る
     if event in ("block_start", "block_end", "emergency_unblock"):
+        # emergency_unblockはPremiumシールドがあれば消費してストリークを保護する
+        if event == "emergency_unblock":
+            full_user = get_user_by_id(user["id"])
+            if full_user.get("plan") == "premium" and use_streak_shield(user["id"]):
+                return jsonify({"ok": True, "shield_used": True})
         add_event_log(user["id"], event)
         apply_event_points(user["id"], event)
     return jsonify({"ok": True})
