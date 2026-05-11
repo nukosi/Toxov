@@ -601,7 +601,7 @@ def get_user_points(user_id) -> dict:
         return {"season_points": pts.season_points, "lifetime_points": pts.lifetime_points}
 
 
-def get_season_ranking(limit=10) -> list:
+def get_season_ranking(limit=20) -> list:
     with Session(engine) as session:
         rows = (
             session.query(UserModel.username, UserPoints.season_points, UserPoints.lifetime_points)
@@ -611,6 +611,26 @@ def get_season_ranking(limit=10) -> list:
             .all()
         )
         return [{"username": r[0], "season_points": r[1], "lifetime_points": r[2]} for r in rows]
+
+
+def get_user_rank_position(user_id: int) -> dict:
+    """ユーザーのシーズン順位・総人数・上位X%を返す。"""
+    with Session(engine) as session:
+        pts = session.get(UserPoints, user_id)
+        if not pts:
+            return {"rank_position": None, "total_users": 0, "top_percent": None}
+        user_season_pts = pts.season_points
+        # 自分より多いポイントのユーザー数 + 1 = 自分の順位
+        rank_position = session.query(UserPoints).filter(
+            UserPoints.season_points > user_season_pts
+        ).count() + 1
+        total_users = session.query(UserPoints).count()
+        top_percent = round(rank_position / total_users * 100) if total_users > 0 else None
+        return {
+            "rank_position": rank_position,
+            "total_users":   total_users,
+            "top_percent":   top_percent,
+        }
 
 
 def record_first_save(user_id: int):

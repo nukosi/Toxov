@@ -17,7 +17,7 @@ from database import (init_db, load_config, save_config,
                       add_app_to_config, record_first_save, record_first_sync, get_analytics,
                       set_stripe_subscription, get_user_by_stripe_customer_id,
                       get_streak_shield, use_streak_shield,
-                      get_premium_count)
+                      get_premium_count, get_user_rank_position)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 from mailer import send_password_reset
@@ -233,6 +233,7 @@ def index():
         r["rank"] = get_rank(r["season_points"])
     limits        = get_limits(current_user.plan)
     streak_shield = get_streak_shield(current_user.id)
+    user_rank     = get_user_rank_position(current_user.id)
     eb            = _earlybird_status()
     analytics = get_analytics() if current_user.role == "admin" else None
     # エージェントが直近90秒以内にpollしていれば接続中とみなす（poll間隔30秒の3倍）
@@ -251,6 +252,7 @@ def index():
                            points=points, rank=rank, ranking=ranking, error=error,
                            plan=current_user.plan, limits=limits,
                            streak_shield=streak_shield,
+                           user_rank=user_rank,
                            earlybird_available=eb["available"],
                            earlybird_remaining=eb["remaining"],
                            role=current_user.role, presets=PRESET_SITES,
