@@ -186,6 +186,22 @@ def block(sites, apps):
             ], capture_output=True)
 
 
+def kill_edge_connections():
+    # 緊急解除後の再ブロック時にEdgeが保持するTCP接続を強制切断する
+    # 確立済みTCPセッションはファイアウォール更新後も維持されるため、切断してから再接続させることで即時ブロックが有効になる
+    ps = (
+        "$pids = (Get-Process -Name msedge -EA SilentlyContinue).Id; "
+        "if ($pids) { "
+        "Get-NetTCPConnection -State Established -EA SilentlyContinue | "
+        "Where-Object { $pids -contains $_.OwningProcess } | "
+        "Remove-NetTCPConnection -Confirm:$false -EA SilentlyContinue }"
+    )
+    subprocess.run(
+        ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
+        capture_output=True, timeout=10,
+    )
+
+
 def unblock(log=None):
     # --- Edge/ChromeのDoHポリシーを削除してデフォルト動作に戻す ---
     set_doh_policy(disable=False)
@@ -483,8 +499,9 @@ def main():
             for event in events:
                 if event == "block_start":
                     if prev_emergency:
-                        # 緊急解除からの復帰：EdgeはDNSキャッシュを持つため再起動が必要
-                        notify("再ブロック完了 — Edgeを再起動してください")
+                        # 緊急解除からの復帰：EdgeのTCP接続を強制切断して即時ブロックを有効にする
+                        kill_edge_connections()
+                        notify("再ブロック完了")
                     else:
                         notify(f"ブロック開始  {get_comment('block_start')}")
                 elif event == "block_end":
