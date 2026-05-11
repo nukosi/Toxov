@@ -463,13 +463,14 @@ def billing_success():
     if session_id and STRIPE_SECRET_KEY:
         try:
             session = stripe.checkout.Session.retrieve(session_id)
-            if session.get("payment_status") in ("paid", "no_payment_required"):
-                user_id = int(session.get("client_reference_id") or 0)
+            status  = getattr(session, "payment_status", None)
+            if status in ("paid", "no_payment_required"):
+                user_id = int(getattr(session, "client_reference_id", None) or 0)
                 if user_id == current_user.id:
                     set_stripe_subscription(
                         user_id,
-                        customer_id     = session.get("customer"),
-                        subscription_id = session.get("subscription"),
+                        customer_id     = getattr(session, "customer", None),
+                        subscription_id = getattr(session, "subscription", None),
                         plan            = "premium",
                     )
         except Exception:
@@ -506,45 +507,48 @@ def billing_webhook():
         return jsonify({"error": "invalid signature"}), 400
 
     # イベント処理：例外が起きても200を返してStripeのリトライを防ぐ
+    # 新しいStripe SDKはStripeObjectがdictを継承しないため、属性アクセスで取得する
     try:
-        etype = event["type"]
-        obj   = event["data"]["object"]
+        etype = event.type
+        obj   = event.data.object
 
         if etype == "checkout.session.completed":
             # サブスク開始（または無料トライアル開始）
-            user_id = int(obj.get("client_reference_id") or 0)
+            user_id = int(getattr(obj, "client_reference_id", None) or 0)
             if user_id:
                 set_stripe_subscription(
                     user_id,
-                    customer_id     = obj.get("customer"),
-                    subscription_id = obj.get("subscription"),
+                    customer_id     = getattr(obj, "customer", None),
+                    subscription_id = getattr(obj, "subscription", None),
                     plan            = "premium",
                 )
 
         elif etype == "customer.subscription.updated":
             # サブスク更新・ステータス変化（active/trialing→premium、それ以外→free）
-            user = get_user_by_stripe_customer_id(obj.get("customer", ""))
+            customer_id = getattr(obj, "customer", "")
+            user = get_user_by_stripe_customer_id(customer_id)
             if user:
-                status     = obj.get("status", "")
-                period_end = obj.get("current_period_end")
+                status     = getattr(obj, "status", "")
+                period_end = getattr(obj, "current_period_end", None)
                 expires_at = (datetime.datetime.utcfromtimestamp(period_end)
                               if period_end else None)
                 new_plan   = "premium" if status in ("active", "trialing") else "free"
                 set_stripe_subscription(
                     user["id"],
-                    customer_id     = obj.get("customer"),
-                    subscription_id = obj.get("id"),
+                    customer_id     = customer_id,
+                    subscription_id = getattr(obj, "id", None),
                     plan            = new_plan,
                     plan_expires_at = expires_at,
                 )
 
         elif etype == "customer.subscription.deleted":
             # 解約完了（猶予期間終了）→ freeに降格
-            user = get_user_by_stripe_customer_id(obj.get("customer", ""))
+            customer_id = getattr(obj, "customer", "")
+            user = get_user_by_stripe_customer_id(customer_id)
             if user:
                 set_stripe_subscription(
                     user["id"],
-                    customer_id     = obj.get("customer"),
+                    customer_id     = customer_id,
                     subscription_id = None,
                     plan            = "free",
                 )
