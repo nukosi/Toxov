@@ -496,52 +496,61 @@ def billing_portal():
 def billing_webhook():
     payload    = request.get_data()
     sig_header = request.headers.get("Stripe-Signature", "")
+
+    # 署名検証：失敗したら400を返してStripeに再送させない
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-    except (stripe.error.SignatureVerificationError, ValueError):
+    except ValueError:
+        return jsonify({"error": "invalid payload"}), 400
+    except Exception:
         return jsonify({"error": "invalid signature"}), 400
 
-    etype = event["type"]
-    obj   = event["data"]["object"]
+    # イベント処理：例外が起きても200を返してStripeのリトライを防ぐ
+    try:
+        etype = event["type"]
+        obj   = event["data"]["object"]
 
-    if etype == "checkout.session.completed":
-        # サブスク開始（または無料トライアル開始）
-        user_id = int(obj.get("client_reference_id") or 0)
-        if user_id:
-            set_stripe_subscription(
-                user_id,
-                customer_id     = obj.get("customer"),
-                subscription_id = obj.get("subscription"),
-                plan            = "premium",
-            )
+        if etype == "checkout.session.completed":
+            # サブスク開始（または無料トライアル開始）
+            user_id = int(obj.get("client_reference_id") or 0)
+            if user_id:
+                set_stripe_subscription(
+                    user_id,
+                    customer_id     = obj.get("customer"),
+                    subscription_id = obj.get("subscription"),
+                    plan            = "premium",
+                )
 
-    elif etype == "customer.subscription.updated":
-        # サブスク更新・ステータス変化（active/trialing→premium、それ以外→free）
-        user = get_user_by_stripe_customer_id(obj.get("customer", ""))
-        if user:
-            status      = obj.get("status", "")
-            period_end  = obj.get("current_period_end")
-            expires_at  = (datetime.datetime.utcfromtimestamp(period_end)
-                           if period_end else None)
-            new_plan    = "premium" if status in ("active", "trialing") else "free"
-            set_stripe_subscription(
-                user["id"],
-                customer_id     = obj.get("customer"),
-                subscription_id = obj.get("id"),
-                plan            = new_plan,
-                plan_expires_at = expires_at,
-            )
+        elif etype == "customer.subscription.updated":
+            # サブスク更新・ステータス変化（active/trialing→premium、それ以外→free）
+            user = get_user_by_stripe_customer_id(obj.get("customer", ""))
+            if user:
+                status     = obj.get("status", "")
+                period_end = obj.get("current_period_end")
+                expires_at = (datetime.datetime.utcfromtimestamp(period_end)
+                              if period_end else None)
+                new_plan   = "premium" if status in ("active", "trialing") else "free"
+                set_stripe_subscription(
+                    user["id"],
+                    customer_id     = obj.get("customer"),
+                    subscription_id = obj.get("id"),
+                    plan            = new_plan,
+                    plan_expires_at = expires_at,
+                )
 
-    elif etype == "customer.subscription.deleted":
-        # 解約完了（猶予期間終了）→ freeに降格
-        user = get_user_by_stripe_customer_id(obj.get("customer", ""))
-        if user:
-            set_stripe_subscription(
-                user["id"],
-                customer_id     = obj.get("customer"),
-                subscription_id = None,
-                plan            = "free",
-            )
+        elif etype == "customer.subscription.deleted":
+            # 解約完了（猶予期間終了）→ freeに降格
+            user = get_user_by_stripe_customer_id(obj.get("customer", ""))
+            if user:
+                set_stripe_subscription(
+                    user["id"],
+                    customer_id     = obj.get("customer"),
+                    subscription_id = None,
+                    plan            = "free",
+                )
+
+    except Exception as e:
+        app.logger.error(f"[webhook] handler error: {e}")
 
     return jsonify({"ok": True})
 
