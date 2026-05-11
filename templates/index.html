@@ -212,15 +212,21 @@ details > summary::-webkit-details-marker { display: none; }
       <div>
         <div style="font-size:.78rem; font-weight:600; color:var(--muted); margin-bottom:3px;">ストリーク保護シールド</div>
         <div style="font-size:.72rem; color:var(--dim);">
-          {% if streak_shield > 0 %}
+          {% if config.emergency_unblock and streak_shield > 0 %}
+            シールド消費予定（エージェントの次回同期時に反映）
+          {% elif streak_shield > 0 %}
             緊急解除1回をなかったことにします（毎月リセット）
           {% else %}
             今月分は使用済みです（来月1日にリセット）
           {% endif %}
         </div>
       </div>
-      <div style="font-size:1.6rem; font-weight:700; color:{% if streak_shield > 0 %}var(--accent){% else %}var(--dim){% endif %}; flex-shrink:0; min-width:40px; text-align:right;">
-        🛡 {{ streak_shield }}
+      <div style="font-size:1.6rem; font-weight:700; color:{% if streak_shield > 0 and not config.emergency_unblock %}var(--accent){% else %}var(--dim){% endif %}; flex-shrink:0; min-width:40px; text-align:right;">
+        {% if config.emergency_unblock and streak_shield > 0 %}
+          🛡 <span style="font-size:1rem;">{{ streak_shield }}→0</span>
+        {% else %}
+          🛡 {{ streak_shield }}
+        {% endif %}
       </div>
     </div>
   </div>

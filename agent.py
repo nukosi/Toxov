@@ -464,9 +464,11 @@ def main():
     tray = setup_tray(add_url, log)
 
     def polling_loop():
-        current_state = None
-        last_version  = None
+        current_state  = None
+        last_version   = None
+        prev_emergency = False  # 前回pollで緊急解除中だったか
         for config in config_stream(cloud_url, log):
+            emergency = config.get("emergency_unblock", False)
             current_state, last_version, events = apply_config(
                 config, current_state, last_version, log
             )
@@ -480,7 +482,11 @@ def main():
                 pass
             for event in events:
                 if event == "block_start":
-                    notify(f"ブロック開始  {get_comment('block_start')}")
+                    if prev_emergency:
+                        # 緊急解除からの復帰：EdgeはDNSキャッシュを持つため再起動が必要
+                        notify("再ブロック完了 — Edgeを再起動してください")
+                    else:
+                        notify(f"ブロック開始  {get_comment('block_start')}")
                 elif event == "block_end":
                     notify(f"ブロック終了  {get_comment('block_end')}")
                 try:
@@ -488,6 +494,7 @@ def main():
                                   headers=_API_HEADERS, timeout=5)
                 except Exception:
                     pass
+            prev_emergency = emergency
 
     # daemon=True にするとメインスレッド（トレイ）が終了したら一緒に終了する
     threading.Thread(target=polling_loop, daemon=True).start()
