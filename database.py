@@ -36,6 +36,11 @@ class UserModel(Base):
     first_save_at  = Column(DateTime, nullable=True)
     first_sync_at  = Column(DateTime, nullable=True)
     last_active_at = Column(DateTime, nullable=True)
+    # Stripe サブスクリプション管理
+    stripe_customer_id     = Column(String, nullable=True, unique=True)
+    stripe_subscription_id = Column(String, nullable=True)
+    trial_ends_at          = Column(DateTime, nullable=True)
+    plan_expires_at        = Column(DateTime, nullable=True)
     config    = relationship("Config", back_populates="user", uselist=False, cascade="all, delete-orphan")
     sites     = relationship("Site", back_populates="user", cascade="all, delete-orphan")
     apps      = relationship("App",  back_populates="user", cascade="all, delete-orphan")
@@ -206,6 +211,15 @@ def _migrate():
             if col not in user_columns_now:
                 conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} TIMESTAMP"))
         conn.commit()
+        # Stripe サブスクリプション管理カラムを追加
+        user_columns_now = [c["name"] for c in inspector.get_columns("users")]
+        for col in ("stripe_customer_id", "stripe_subscription_id"):
+            if col not in user_columns_now:
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} TEXT"))
+        for col in ("trial_ends_at", "plan_expires_at"):
+            if col not in user_columns_now:
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} TIMESTAMP"))
+        conn.commit()
 
 
 def create_user(username, password, email=None):
@@ -242,7 +256,9 @@ def get_user_by_id(user_id):
         return {"id": user.id, "username": user.username, "api_token": user.api_token,
                 "plan": user.plan or "free", "role": user.role or "user",
                 "connect_code": user.connect_code, "email": user.email,
-                "last_active_at": user.last_active_at} if user else None
+                "last_active_at": user.last_active_at,
+                "stripe_customer_id": user.stripe_customer_id,
+                "plan_expires_at": user.plan_expires_at} if user else None
 
 
 def get_user_by_token(token):
@@ -650,6 +666,29 @@ def add_app_to_config(user_id: int, path: str) -> bool:
             config.version = (config.version or 0) + 1
         session.commit()
     return True
+
+
+def set_stripe_subscription(user_id: int, customer_id, subscription_id, plan: str,
+                             trial_ends_at=None, plan_expires_at=None):
+    """Webhookイベントを受けてStripeサブスク情報とプランをまとめて更新する。"""
+    with Session(engine) as session:
+        user = session.get(UserModel, user_id)
+        if user:
+            user.stripe_customer_id     = customer_id
+            user.stripe_subscription_id = subscription_id
+            user.plan                   = plan
+            if trial_ends_at is not None:
+                user.trial_ends_at = trial_ends_at
+            if plan_expires_at is not None:
+                user.plan_expires_at = plan_expires_at
+            session.commit()
+
+
+def get_user_by_stripe_customer_id(customer_id: str):
+    """WebhookイベントのcustomerフィールドからユーザーIDを引く。"""
+    with Session(engine) as session:
+        user = session.query(UserModel).filter_by(stripe_customer_id=customer_id).first()
+        return {"id": user.id} if user else None
 
 
 def save_config(user_id, block_start, block_end, sites, apps=None):

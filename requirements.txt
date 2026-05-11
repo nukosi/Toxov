@@ -9,3 +9,4 @@ werkzeug
 gunicorn
 requests
 resend
+stripe

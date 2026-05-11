@@ -6,6 +6,7 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 import datetime
+import stripe
 from database import (init_db, load_config, save_config,
                       verify_password, create_user, get_user_by_id, get_user_by_token,
                       set_emergency_unblock, add_event_log, get_event_logs, get_streak,
@@ -13,7 +14,8 @@ from database import (init_db, load_config, save_config,
                       apply_event_points, get_user_points, get_season_ranking, get_rank,
                       get_user_by_connect_code, get_user_by_email, set_user_email,
                       create_reset_token, verify_reset_token, consume_reset_token, update_password,
-                      add_app_to_config, record_first_save, record_first_sync, get_analytics)
+                      add_app_to_config, record_first_save, record_first_sync, get_analytics,
+                      set_stripe_subscription, get_user_by_stripe_customer_id)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 from mailer import send_password_reset
@@ -75,6 +77,15 @@ limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="m
 
 # エージェント認証シークレット。Railway環境変数 AGENT_SECRET と agent.py の定数を同じ値にする
 AGENT_SECRET = os.environ.get("AGENT_SECRET", "")
+
+# Stripe設定。Railway環境変数に設定してから使う
+STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET  = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_PRICE_MONTHLY   = os.environ.get("STRIPE_PRICE_MONTHLY", "")
+STRIPE_PRICE_YEARLY    = os.environ.get("STRIPE_PRICE_YEARLY", "")
+STRIPE_PRICE_EARLYBIRD = os.environ.get("STRIPE_PRICE_EARLYBIRD", "")
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
 
 # RailwayサーバーはUTCなので、表示・判定にはJSTに変換して使う
 JST = datetime.timezone(datetime.timedelta(hours=9))
@@ -219,7 +230,12 @@ def index():
                            points=points, rank=rank, ranking=ranking, error=error,
                            plan=current_user.plan, limits=limits,
                            role=current_user.role, presets=PRESET_SITES,
-                           analytics=analytics, agent_connected=agent_connected)
+                           analytics=analytics, agent_connected=agent_connected,
+                           payment=request.args.get("payment"),
+                           plan_expires_at=user_data.get("plan_expires_at"),
+                           stripe_price_monthly=STRIPE_PRICE_MONTHLY,
+                           stripe_price_yearly=STRIPE_PRICE_YEARLY,
+                           stripe_price_earlybird=STRIPE_PRICE_EARLYBIRD)
 
 
 @app.route("/save", methods=["POST"])
@@ -409,6 +425,127 @@ def profile():
 @app.route("/download")
 def download():
     return send_from_directory("dist", "Toxov.exe", as_attachment=True)
+
+
+@app.route("/billing/checkout", methods=["POST"])
+@login_required
+def billing_checkout():
+    price_id    = request.form.get("price_id", "").strip()
+    valid_prices = {STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY, STRIPE_PRICE_EARLYBIRD} - {""}
+    if price_id not in valid_prices or not STRIPE_SECRET_KEY:
+        return redirect(url_for("index"))
+    user_data = get_user_by_id(current_user.id)
+    params = {
+        "payment_method_types": ["card"],
+        "line_items": [{"price": price_id, "quantity": 1}],
+        "mode": "subscription",
+        # 7日間の無料トライアルをすべてのプランに付与する
+        "subscription_data": {"trial_period_days": 7},
+        # WebhookでユーザーIDを特定するためにclient_reference_idを使う
+        "client_reference_id": str(current_user.id),
+        "success_url": url_for("billing_success", _external=True),
+        "cancel_url":  url_for("index", _external=True),
+    }
+    # 既存のStripeカスタマーIDがあれば再利用する（重複カスタマー防止）
+    if user_data.get("stripe_customer_id"):
+        params["customer"] = user_data["stripe_customer_id"]
+    elif user_data.get("email"):
+        params["customer_email"] = user_data["email"]
+    session = stripe.checkout.Session.create(**params)
+    return redirect(session.url, 303)
+
+
+@app.route("/billing/success")
+@login_required
+def billing_success():
+    # Stripeの決済完了後のリダイレクト先。Webhookが非同期で届くため即時反映は保証できない
+    return redirect(url_for("index", payment="success"))
+
+
+@app.route("/billing/portal")
+@login_required
+def billing_portal():
+    user_data   = get_user_by_id(current_user.id)
+    customer_id = user_data.get("stripe_customer_id")
+    if not customer_id or not STRIPE_SECRET_KEY:
+        return redirect(url_for("index"))
+    portal = stripe.billing_portal.Session.create(
+        customer=customer_id,
+        return_url=url_for("index", _external=True),
+    )
+    return redirect(portal.url, 303)
+
+
+@app.route("/billing/webhook", methods=["POST"])
+@csrf.exempt
+def billing_webhook():
+    payload    = request.get_data()
+    sig_header = request.headers.get("Stripe-Signature", "")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except (stripe.error.SignatureVerificationError, ValueError):
+        return jsonify({"error": "invalid signature"}), 400
+
+    etype = event["type"]
+    obj   = event["data"]["object"]
+
+    if etype == "checkout.session.completed":
+        # サブスク開始（または無料トライアル開始）
+        user_id = int(obj.get("client_reference_id") or 0)
+        if user_id:
+            set_stripe_subscription(
+                user_id,
+                customer_id     = obj.get("customer"),
+                subscription_id = obj.get("subscription"),
+                plan            = "premium",
+            )
+
+    elif etype == "customer.subscription.updated":
+        # サブスク更新・ステータス変化（active/trialing→premium、それ以外→free）
+        user = get_user_by_stripe_customer_id(obj.get("customer", ""))
+        if user:
+            status      = obj.get("status", "")
+            period_end  = obj.get("current_period_end")
+            expires_at  = (datetime.datetime.utcfromtimestamp(period_end)
+                           if period_end else None)
+            new_plan    = "premium" if status in ("active", "trialing") else "free"
+            set_stripe_subscription(
+                user["id"],
+                customer_id     = obj.get("customer"),
+                subscription_id = obj.get("id"),
+                plan            = new_plan,
+                plan_expires_at = expires_at,
+            )
+
+    elif etype == "customer.subscription.deleted":
+        # 解約完了（猶予期間終了）→ freeに降格
+        user = get_user_by_stripe_customer_id(obj.get("customer", ""))
+        if user:
+            set_stripe_subscription(
+                user["id"],
+                customer_id     = obj.get("customer"),
+                subscription_id = None,
+                plan            = "free",
+            )
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/me/subscription/<token>")
+@csrf.exempt
+def api_subscription(token):
+    """エージェント・モバイル向けのサブスクリプション状態API。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    data       = get_user_by_id(user["id"])
+    expires_at = data.get("plan_expires_at")
+    return jsonify({
+        "plan":           data.get("plan", "free"),
+        "plan_expires_at": expires_at.isoformat() if expires_at else None,
+    })
 
 
 @app.route("/setup", methods=["GET", "POST"])

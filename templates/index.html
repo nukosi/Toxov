@@ -33,6 +33,14 @@
   </svg>
   {% endif %}
 </a>
+<a href="#" class="sb-link" data-tab="billing" style="{% if plan == 'free' %}color:var(--accent);{% endif %}">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="1" y="3.5" width="14" height="9" rx="1.5"/>
+    <line x1="1" y1="7" x2="15" y2="7"/>
+    <line x1="4" y1="10.5" x2="6" y2="10.5"/>
+  </svg>
+  {% if plan == 'free' %}Premium{% else %}サブスク{% endif %}
+</a>
 <a href="#" class="sb-link" data-tab="log">
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
     <line x1="2" y1="4"  x2="14" y2="4"/>
@@ -104,6 +112,9 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="banners">
   {% if saved %}
     <div class="banner banner-ok">設定を保存しました</div>
+  {% endif %}
+  {% if payment == 'success' %}
+    <div class="banner banner-ok">決済が完了しました。Premiumプランへようこそ！（反映まで数秒かかる場合があります）</div>
   {% endif %}
   {% if error == "blocking" %}
     <div class="banner banner-err">ブロック時間中はスケジュール変更・削除はできません</div>
@@ -418,6 +429,93 @@ details > summary::-webkit-details-marker { display: none; }
   {% endif %}
 
 </div><!-- /tab-ranking -->
+
+<!-- ═══════════════════════════════════════
+     プレミアム / サブスク管理
+═══════════════════════════════════════ -->
+<div id="tab-billing" class="tab">
+
+  {% if plan == 'free' %}
+  <!-- アーリーバード（目立つカード） -->
+  <div class="card" style="border:1px solid rgba(249,115,22,0.35); text-align:center; padding:28px 24px; margin-bottom:10px; position:relative; overflow:hidden;">
+    <div style="position:absolute; top:0; right:0; background:var(--accent); color:#fff; font-size:.62rem; font-weight:700; letter-spacing:1px; padding:4px 12px; border-radius:0 0 0 10px;">6/15まで限定</div>
+    <div style="font-size:.68rem; text-transform:uppercase; letter-spacing:2px; color:var(--accent); margin-bottom:12px;">Early Bird</div>
+    <div style="font-size:2.4rem; font-weight:800; color:var(--text); letter-spacing:-1px;">¥3,000<span style="font-size:1rem; font-weight:400; color:var(--dim);">/年</span></div>
+    <div style="font-size:.78rem; color:var(--accent); font-weight:600; margin-top:6px; margin-bottom:4px;">このまま永久にこの価格</div>
+    <div style="font-size:.72rem; color:var(--dim); margin-bottom:20px;">通常年額 ¥5,000 → 40%オフ</div>
+    {% if stripe_price_earlybird %}
+    <form action="/billing/checkout" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="price_id" value="{{ stripe_price_earlybird }}">
+      <button type="submit" class="btn btn-primary" style="padding:12px 36px; font-size:.95rem; width:100%;">7日間無料で始める →</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <!-- 月額・年額 -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+    <!-- 月額 -->
+    <div class="card" style="text-align:center; padding:20px 16px;">
+      <div style="font-size:.68rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--muted); margin-bottom:12px;">月額</div>
+      <div style="font-size:1.6rem; font-weight:700; color:var(--text);">¥1,000<span style="font-size:.8rem; font-weight:400; color:var(--dim);">/月</span></div>
+      <div style="font-size:.7rem; color:var(--dim); margin:8px 0 16px;">いつでも解約可</div>
+      {% if stripe_price_monthly %}
+      <form action="/billing/checkout" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="price_id" value="{{ stripe_price_monthly }}">
+        <button type="submit" class="btn btn-ghost btn-full" style="font-size:.82rem;">試してみる</button>
+      </form>
+      {% endif %}
+    </div>
+    <!-- 年額 -->
+    <div class="card" style="text-align:center; padding:20px 16px;">
+      <div style="font-size:.68rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--muted); margin-bottom:12px;">年額</div>
+      <div style="font-size:1.6rem; font-weight:700; color:var(--text);">¥5,000<span style="font-size:.8rem; font-weight:400; color:var(--dim);">/年</span></div>
+      <div style="font-size:.7rem; color:var(--dim); margin:8px 0 16px;">月払いより<strong style="color:var(--text);">58%</strong>お得</div>
+      {% if stripe_price_yearly %}
+      <form action="/billing/checkout" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="price_id" value="{{ stripe_price_yearly }}">
+        <button type="submit" class="btn btn-ghost btn-full" style="font-size:.82rem;">試してみる</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 機能比較 -->
+  <div class="card" style="padding:18px 20px;">
+    <div style="font-size:.72rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:14px;">すべてのプランに含まれるもの</div>
+    {% for item in ["7日間の無料トライアル", "ストリーク機能", "継続率・ポイント確認", "Webサイト・アプリのブロック"] %}
+    <div style="display:flex; align-items:center; gap:8px; padding:5px 0; font-size:.84rem; color:var(--dim);">
+      <span style="color:var(--success); font-size:1rem;">✓</span> {{ item }}
+    </div>
+    {% endfor %}
+    <div style="border-top:1px solid var(--border); margin:12px 0 10px;"></div>
+    <div style="font-size:.72rem; text-transform:uppercase; letter-spacing:1px; color:var(--accent); margin-bottom:10px;">Premiumのみ</div>
+    {% for item in ["シーズンランキング参加・閲覧", "自分の上位X%表示"] %}
+    <div style="display:flex; align-items:center; gap:8px; padding:5px 0; font-size:.84rem; color:var(--dim);">
+      <span style="color:var(--accent); font-size:1rem;">★</span> {{ item }}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <!-- Premiumユーザー：サブスク管理 -->
+  <div class="card" style="text-align:center; padding:32px 24px; margin-bottom:10px;">
+    <div style="font-size:.68rem; text-transform:uppercase; letter-spacing:2px; color:var(--accent); margin-bottom:16px;">現在のプラン</div>
+    <div style="font-size:1.5rem; font-weight:700; color:var(--text); margin-bottom:8px;">Toxov Premium</div>
+    {% if plan_expires_at %}
+    <div style="font-size:.8rem; color:var(--dim); margin-bottom:24px;">次回更新: {{ plan_expires_at.strftime('%Y/%m/%d') }}</div>
+    {% else %}
+    <div style="font-size:.8rem; color:var(--dim); margin-bottom:24px;">サブスクリプション有効</div>
+    {% endif %}
+    <a href="/billing/portal" class="btn btn-ghost" style="display:inline-block; font-size:.88rem; padding:10px 28px;">
+      プランを変更・解約する
+    </a>
+  </div>
+  {% endif %}
+
+</div><!-- /tab-billing -->
 
 <!-- ═══════════════════════════════════════
      ログ
