@@ -192,7 +192,7 @@ def kill_edge_connections(log=None):
     try:
         result = subprocess.run(
             ["wmic", "process", "where",
-             "name='msedge.exe' and commandline like '%--type=network-service%'",
+             "name='msedge.exe' and commandline like '%network.mojom.NetworkService%'",
              "get", "ProcessId", "/format:value"],
             capture_output=True, text=True, timeout=15,
         )
