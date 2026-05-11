@@ -759,9 +759,9 @@ details > summary::-webkit-details-marker { display: none; }
     });
   });
 
-  // 初期タブ（保存後リダイレクト時はsettingsを維持）
+  // エラー時はsettingsタブ（修正できるように）、保存成功時はhomeタブ（バナーが見えるように）
   const savedTab = sessionStorage.getItem('toxov-tab') || 'home';
-  const initialTab = {{ '"settings"' if saved or error else 'savedTab' }};
+  const initialTab = {% if error %}"settings"{% elif saved %}"home"{% else %}savedTab{% endif %};
   showTab(initialTab);
 
   // ─── プリセット ───
