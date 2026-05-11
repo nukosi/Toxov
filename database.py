@@ -44,6 +44,9 @@ class UserModel(Base):
     # ストリーク保護シールド（Premium月次配布・持越しなし）
     streak_shield       = Column(Integer, nullable=True, default=0)
     shield_refreshed_at = Column(DateTime, nullable=True)
+    # 管理者2FA用OTP
+    otp_code       = Column(String, nullable=True)
+    otp_expires_at = Column(DateTime, nullable=True)
     config    = relationship("Config", back_populates="user", uselist=False, cascade="all, delete-orphan")
     sites     = relationship("Site", back_populates="user", cascade="all, delete-orphan")
     apps      = relationship("App",  back_populates="user", cascade="all, delete-orphan")
@@ -229,6 +232,13 @@ def _migrate():
             conn.execute(text("ALTER TABLE users ADD COLUMN streak_shield INTEGER DEFAULT 0"))
         if "shield_refreshed_at" not in user_columns_now:
             conn.execute(text("ALTER TABLE users ADD COLUMN shield_refreshed_at TIMESTAMP"))
+        conn.commit()
+        # 管理者2FA用OTPカラムを追加
+        user_columns_now = [c["name"] for c in inspector.get_columns("users")]
+        if "otp_code" not in user_columns_now:
+            conn.execute(text("ALTER TABLE users ADD COLUMN otp_code TEXT"))
+        if "otp_expires_at" not in user_columns_now:
+            conn.execute(text("ALTER TABLE users ADD COLUMN otp_expires_at TIMESTAMP"))
         conn.commit()
 
 
@@ -681,6 +691,33 @@ def get_analytics() -> dict:
             "active_14d": active_within(14),
             "active_30d": active_within(30),
         }
+
+
+def set_otp(user_id: int, code: str, expires_at: datetime.datetime):
+    """管理者2FA用のOTPをDBに保存する。"""
+    with Session(engine) as session:
+        user = session.get(UserModel, user_id)
+        if user:
+            user.otp_code       = code
+            user.otp_expires_at = expires_at
+            session.commit()
+
+
+def verify_otp(user_id: int, code: str) -> bool:
+    """OTPを検証して使用済みにする。正しければTrue、無効/期限切れならFalse。"""
+    now = datetime.datetime.utcnow()
+    with Session(engine) as session:
+        user = session.get(UserModel, user_id)
+        if not user or not user.otp_code or not user.otp_expires_at:
+            return False
+        if now > user.otp_expires_at:
+            return False
+        if user.otp_code != code:
+            return False
+        user.otp_code       = None
+        user.otp_expires_at = None
+        session.commit()
+    return True
 
 
 def add_app_to_config(user_id: int, path: str) -> bool:

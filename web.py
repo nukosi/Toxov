@@ -17,10 +17,11 @@ from database import (init_db, load_config, save_config,
                       add_app_to_config, record_first_save, record_first_sync, get_analytics,
                       set_stripe_subscription, get_user_by_stripe_customer_id,
                       get_streak_shield, use_streak_shield,
-                      get_premium_count, get_user_rank_position)
+                      get_premium_count, get_user_rank_position,
+                      set_otp, verify_otp)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
-from mailer import send_password_reset
+from mailer import send_password_reset, send_otp_email
 
 PRESET_SITES = [
     {
@@ -193,11 +194,46 @@ def login():
         user = verify_password(username, password)
         if user:
             data = get_user_by_id(user["id"])
-            login_user(User(data["id"], data["username"], data["api_token"],
-                           data.get("plan", "free"), data.get("role", "user")))
-            return redirect(url_for("index"))
-        error = "ユーザー名またはパスワードが違います"
+            if data.get("role") == "admin":
+                # 管理者は2FA必須：OTPを生成してメール送信し確認画面へ
+                if not data.get("email"):
+                    error = "管理者アカウントにメールアドレスが登録されていません"
+                else:
+                    code       = f"{secrets.randbelow(1000000):06d}"
+                    expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
+                    set_otp(data["id"], code, expires_at)
+                    send_otp_email(data["email"], code)
+                    from flask import session as flask_session
+                    flask_session["_2fa_user_id"] = data["id"]
+                    return redirect(url_for("login_verify"))
+            else:
+                login_user(User(data["id"], data["username"], data["api_token"],
+                               data.get("plan", "free"), data.get("role", "user")))
+                return redirect(url_for("index"))
+        if not error:
+            error = "ユーザー名またはパスワードが違います"
     return render_template("login.html", error=error)
+
+
+@app.route("/login/verify", methods=["GET", "POST"])
+@limiter.limit("10 per minute")
+def login_verify():
+    from flask import session as flask_session
+    user_id = flask_session.get("_2fa_user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+    error = None
+    if request.method == "POST":
+        code = request.form.get("code", "").strip()
+        if verify_otp(user_id, code):
+            flask_session.pop("_2fa_user_id", None)
+            data = get_user_by_id(user_id)
+            login_user(User(data["id"], data["username"], data["api_token"],
+                           data.get("plan", "free"), data.get("role", "user"),
+                           data.get("connect_code")))
+            return redirect(url_for("index"))
+        error = "コードが正しくないか期限切れです"
+    return render_template("login_verify.html", error=error)
 
 
 @app.route("/logout")
@@ -398,6 +434,8 @@ def api_log(token):
         if event == "emergency_unblock":
             full_user = get_user_by_id(user["id"])
             if full_user.get("plan") == "premium" and use_streak_shield(user["id"]):
+                # シールド消費をログに残す（緊急解除は記録せずストリーク保護）
+                add_event_log(user["id"], "shield_used")
                 return jsonify({"ok": True, "shield_used": True})
         add_event_log(user["id"], event)
         apply_event_points(user["id"], event)
