@@ -8,8 +8,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --accent: #84FF00;
-      --accent-dim: rgba(132,255,0,0.12);
+      --accent: #F97316;
+      --accent-dim: rgba(249,115,22,0.12);
       --bg: #0f0f0f;
       --bg-card: #1a1a1a;
       --border: #2a2a2a;
@@ -48,13 +48,13 @@
       transition: opacity 0.2s;
     }
     .btn:hover { opacity: 0.82; }
-    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary { background: var(--accent); color: #fff; }
     .btn-ghost   { background: transparent; color: #aaa; border: 1px solid #333; }
 
     /* アーリーバードバナー */
     .earlybird-banner {
-      background: linear-gradient(90deg, rgba(132,255,0,0.15), rgba(132,255,0,0.08));
-      border-bottom: 1px solid rgba(132,255,0,0.2);
+      background: linear-gradient(90deg, rgba(249,115,22,0.15), rgba(249,115,22,0.08));
+      border-bottom: 1px solid rgba(249,115,22,0.2);
       text-align: center;
       padding: 10px 24px;
       font-size: .82rem;
@@ -152,8 +152,8 @@
       position: relative;
     }
     .plan-card.featured {
-      border-color: rgba(132,255,0,0.5);
-      background: linear-gradient(180deg, rgba(132,255,0,0.06) 0%, var(--bg-card) 100%);
+      border-color: rgba(249,115,22,0.5);
+      background: linear-gradient(180deg, rgba(249,115,22,0.06) 0%, var(--bg-card) 100%);
     }
     .plan-badge {
       position: absolute;
@@ -184,7 +184,7 @@
       margin-top: auto;
     }
     .plan-cta:hover { opacity: .82; }
-    .plan-cta.primary { background: var(--accent); color: #000; }
+    .plan-cta.primary { background: var(--accent); color: #fff; }
     .plan-cta.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
     .plan-trial { font-size: .72rem; color: var(--dim); margin-top: 10px; }
 
@@ -307,7 +307,7 @@
       <div class="feature-card">
         <div class="feature-icon">🏆</div>
         <h3>ランキング</h3>
-        <p>他のユーザーと継続日数・ポイントを競えます。自分が全体の何%にいるか可視化されます。<br><span style="font-size:.78rem;color:#84FF00;">Premiumのみ</span></p>
+        <p>他のユーザーと継続日数・ポイントを競えます。自分が全体の何%にいるか可視化されます。<br><span style="font-size:.78rem;color:#F97316;">Premiumのみ</span></p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🚨</div>
@@ -336,7 +336,7 @@
         <div class="plan-badge">先着50名・6/30まで限定</div>
         <div class="plan-name">Early Bird</div>
         <div class="plan-price">¥3,000<span>/年</span></div>
-        <div class="plan-desc">この価格が永久に適用されます。通常年額 ¥5,000 → <strong style="color:#84FF00;">40%オフ</strong><br><span style="color:var(--accent); font-size:.8rem; font-weight:600;">残り{{ earlybird_remaining }}名</span></div>
+        <div class="plan-desc">この価格が永久に適用されます。通常年額 ¥5,000 → <strong style="color:#F97316;">40%オフ</strong><br><span style="color:var(--accent); font-size:.8rem; font-weight:600;">残り{{ earlybird_remaining }}名</span></div>
         <a href="/register" class="plan-cta primary">7日間無料で試す</a>
         <div class="plan-trial">クレジットカード登録後、7日間無料</div>
       </div>
