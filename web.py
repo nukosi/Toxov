@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory, session as flask_session
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -6,6 +6,7 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 import datetime
+import secrets
 import stripe
 from database import (init_db, load_config, save_config,
                       verify_password, create_user, get_user_by_id, get_user_by_token,
@@ -203,7 +204,6 @@ def login():
                     expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
                     set_otp(data["id"], code, expires_at)
                     send_otp_email(data["email"], code)
-                    from flask import session as flask_session
                     flask_session["_2fa_user_id"] = data["id"]
                     return redirect(url_for("login_verify"))
             else:
@@ -218,7 +218,6 @@ def login():
 @app.route("/login/verify", methods=["GET", "POST"])
 @limiter.limit("10 per minute")
 def login_verify():
-    from flask import session as flask_session
     user_id = flask_session.get("_2fa_user_id")
     if not user_id:
         return redirect(url_for("login"))
