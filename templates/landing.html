@@ -250,11 +250,13 @@
 </head>
 <body>
 
-  <!-- アーリーバードバナー -->
+  <!-- アーリーバードバナー（枠・期限内のみ表示） -->
+  {% if earlybird_available %}
   <div class="earlybird-banner">
     🎉 Early Bird 特別価格 ¥3,000/年（永久）
-    <span>6月15日まで限定 · 今すぐ登録すれば7日間無料で試せます</span>
+    <span>先着50名・6月30日まで限定 · 残り{{ earlybird_remaining }}名 · 7日間無料トライアルあり</span>
   </div>
+  {% endif %}
 
   <nav>
     <span class="nav-logo">Toxov</span>
@@ -328,15 +330,17 @@
         <a href="/register" class="plan-cta ghost">無料で始める</a>
       </div>
 
-      <!-- アーリーバード -->
+      <!-- アーリーバード（枠・期限内のみ表示） -->
+      {% if earlybird_available %}
       <div class="plan-card featured">
-        <div class="plan-badge">6/15まで限定</div>
+        <div class="plan-badge">先着50名・6/30まで限定</div>
         <div class="plan-name">Early Bird</div>
         <div class="plan-price">¥3,000<span>/年</span></div>
-        <div class="plan-desc">この価格が永久に適用されます。通常年額 ¥5,000 → <strong style="color:#F97316;">40%オフ</strong></div>
+        <div class="plan-desc">この価格が永久に適用されます。通常年額 ¥5,000 → <strong style="color:#F97316;">40%オフ</strong><br><span style="color:var(--accent); font-size:.8rem; font-weight:600;">残り{{ earlybird_remaining }}名</span></div>
         <a href="/register" class="plan-cta primary">7日間無料で試す</a>
         <div class="plan-trial">クレジットカード登録後、7日間無料</div>
       </div>
+      {% endif %}
 
       <!-- 月額 -->
       <div class="plan-card">

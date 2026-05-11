@@ -701,6 +701,12 @@ def get_user_by_stripe_customer_id(customer_id: str):
         return {"id": user.id} if user else None
 
 
+def get_premium_count() -> int:
+    """現在のPremiumユーザー数を返す（アーリーバード枠管理用）。"""
+    with Session(engine) as session:
+        return session.query(UserModel).filter_by(plan="premium").count()
+
+
 def get_streak_shield(user_id: int) -> int:
     """シールド枚数を返す。月が変わっていれば1にリセット（premiumのみ）。"""
     JST = datetime.timezone(datetime.timedelta(hours=9))

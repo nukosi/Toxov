@@ -16,7 +16,8 @@ from database import (init_db, load_config, save_config,
                       create_reset_token, verify_reset_token, consume_reset_token, update_password,
                       add_app_to_config, record_first_save, record_first_sync, get_analytics,
                       set_stripe_subscription, get_user_by_stripe_customer_id,
-                      get_streak_shield, use_streak_shield)
+                      get_streak_shield, use_streak_shield,
+                      get_premium_count)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 from mailer import send_password_reset
@@ -90,6 +91,20 @@ if STRIPE_SECRET_KEY:
 
 # RailwayサーバーはUTCなので、表示・判定にはJSTに変換して使う
 JST = datetime.timezone(datetime.timedelta(hours=9))
+
+# アーリーバード: 先着50名 または 6/30 23:59 JST まで（先に達した方が優先）
+EARLYBIRD_MAX      = 50
+EARLYBIRD_DEADLINE = datetime.datetime(2026, 6, 30, 23, 59, 0)  # tzinfo なし・JST 想定
+
+
+def _earlybird_status() -> dict:
+    """アーリーバードが購入可能か・残り枠数を返す。"""
+    now_jst   = datetime.datetime.now(JST).replace(tzinfo=None)
+    count     = get_premium_count()
+    remaining = max(0, EARLYBIRD_MAX - count)
+    available = remaining > 0 and now_jst <= EARLYBIRD_DEADLINE
+    return {"available": available, "remaining": remaining}
+
 
 # gunicornはif __name__ == "__main__"を通らないのでここで初期化する
 init_db()
@@ -196,7 +211,10 @@ def logout():
 def index():
     # 未ログインはランディングページ、ログイン済みはダッシュボードを返す
     if not current_user.is_authenticated:
-        return render_template("landing.html")
+        eb = _earlybird_status()
+        return render_template("landing.html",
+                               earlybird_available=eb["available"],
+                               earlybird_remaining=eb["remaining"])
     config   = load_config(current_user.id)
     blocking = is_blocking_time(config)
     saved    = request.args.get("saved", False)
@@ -215,6 +233,7 @@ def index():
         r["rank"] = get_rank(r["season_points"])
     limits        = get_limits(current_user.plan)
     streak_shield = get_streak_shield(current_user.id)
+    eb            = _earlybird_status()
     analytics = get_analytics() if current_user.role == "admin" else None
     # エージェントが直近90秒以内にpollしていれば接続中とみなす（poll間隔30秒の3倍）
     user_data       = get_user_by_id(current_user.id)
@@ -232,6 +251,8 @@ def index():
                            points=points, rank=rank, ranking=ranking, error=error,
                            plan=current_user.plan, limits=limits,
                            streak_shield=streak_shield,
+                           earlybird_available=eb["available"],
+                           earlybird_remaining=eb["remaining"],
                            role=current_user.role, presets=PRESET_SITES,
                            analytics=analytics, agent_connected=agent_connected,
                            payment=request.args.get("payment"),

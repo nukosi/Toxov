@@ -471,13 +471,15 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="tab-billing" class="tab">
 
   {% if plan == 'free' %}
-  <!-- アーリーバード（目立つカード） -->
+  <!-- アーリーバード（枠・期限内のみ表示） -->
+  {% if earlybird_available %}
   <div class="card" style="border:1px solid rgba(249,115,22,0.35); text-align:center; padding:28px 24px; margin-bottom:10px; position:relative; overflow:hidden;">
-    <div style="position:absolute; top:0; right:0; background:var(--accent); color:#fff; font-size:.62rem; font-weight:700; letter-spacing:1px; padding:4px 12px; border-radius:0 0 0 10px;">6/15まで限定</div>
+    <div style="position:absolute; top:0; right:0; background:var(--accent); color:#fff; font-size:.62rem; font-weight:700; letter-spacing:1px; padding:4px 12px; border-radius:0 0 0 10px;">先着50名・6/30まで限定</div>
     <div style="font-size:.68rem; text-transform:uppercase; letter-spacing:2px; color:var(--accent); margin-bottom:12px;">Early Bird</div>
     <div style="font-size:2.4rem; font-weight:800; color:var(--text); letter-spacing:-1px;">¥3,000<span style="font-size:1rem; font-weight:400; color:var(--dim);">/年</span></div>
     <div style="font-size:.78rem; color:var(--accent); font-weight:600; margin-top:6px; margin-bottom:4px;">このまま永久にこの価格</div>
-    <div style="font-size:.72rem; color:var(--dim); margin-bottom:20px;">通常年額 ¥5,000 → 40%オフ</div>
+    <div style="font-size:.72rem; color:var(--dim); margin-bottom:4px;">通常年額 ¥5,000 → 40%オフ</div>
+    <div style="font-size:.76rem; color:var(--accent); font-weight:600; margin-bottom:20px;">残り{{ earlybird_remaining }}名</div>
     {% if stripe_price_earlybird %}
     <form action="/billing/checkout" method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -486,6 +488,7 @@ details > summary::-webkit-details-marker { display: none; }
     </form>
     {% endif %}
   </div>
+  {% endif %}
 
   <!-- 月額・年額 -->
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
