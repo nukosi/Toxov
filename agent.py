@@ -186,19 +186,28 @@ def block(sites, apps):
             ], capture_output=True)
 
 
-def kill_edge_connections():
-    # EdgeのNetwork Serviceプロセスだけを終了して全接続をリセットする
-    # TCPキルではEdgeがキャッシュIPで即再接続するため、NetworkService終了が確実
-    # NetworkServiceはEdgeに自動再起動されるため、再起動後は更新済みhostsファイルが適用される
-    ps = (
-        "Get-CimInstance Win32_Process -Filter \"Name='msedge.exe'\" | "
-        "Where-Object { $_.CommandLine -like '*--type=network-service*' } | "
-        "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }"
-    )
-    subprocess.run(
-        ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
-        capture_output=True, timeout=10,
-    )
+def kill_edge_connections(log=None):
+    # EdgeのNetwork Serviceプロセスだけをwmicで特定して終了する
+    # NetworkServiceはEdgeに自動再起動され、再起動後は空のDNSキャッシュで動作するためhostsが即時反映される
+    try:
+        result = subprocess.run(
+            ["wmic", "process", "where",
+             "name='msedge.exe' and commandline like '%--type=network-service%'",
+             "get", "ProcessId", "/format:value"],
+            capture_output=True, text=True, timeout=15,
+        )
+        killed = 0
+        for line in result.stdout.strip().splitlines():
+            if "=" in line:
+                pid = line.split("=")[-1].strip()
+                if pid.isdigit():
+                    subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
+                    killed += 1
+        if log:
+            log(f"[kill_edge] NetworkService {killed}件終了")
+    except Exception as e:
+        if log:
+            log(f"[kill_edge] エラー: {e}")
 
 
 def unblock(log=None):
@@ -498,8 +507,7 @@ def main():
             for event in events:
                 if event == "block_start":
                     if prev_emergency:
-                        # 緊急解除からの復帰：EdgeのTCP接続を強制切断して即時ブロックを有効にする
-                        kill_edge_connections()
+                        kill_edge_connections(log)
                         notify("再ブロック完了")
                     else:
                         notify(f"ブロック開始  {get_comment('block_start')}")
