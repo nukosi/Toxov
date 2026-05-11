@@ -187,14 +187,13 @@ def block(sites, apps):
 
 
 def kill_edge_connections():
-    # 緊急解除後の再ブロック時にEdgeが保持するTCP接続を強制切断する
-    # 確立済みTCPセッションはファイアウォール更新後も維持されるため、切断してから再接続させることで即時ブロックが有効になる
+    # EdgeのNetwork Serviceプロセスだけを終了して全接続をリセットする
+    # TCPキルではEdgeがキャッシュIPで即再接続するため、NetworkService終了が確実
+    # NetworkServiceはEdgeに自動再起動されるため、再起動後は更新済みhostsファイルが適用される
     ps = (
-        "$pids = (Get-Process -Name msedge -EA SilentlyContinue).Id; "
-        "if ($pids) { "
-        "Get-NetTCPConnection -State Established -EA SilentlyContinue | "
-        "Where-Object { $pids -contains $_.OwningProcess } | "
-        "Remove-NetTCPConnection -Confirm:$false -EA SilentlyContinue }"
+        "Get-CimInstance Win32_Process -Filter \"Name='msedge.exe'\" | "
+        "Where-Object { $_.CommandLine -like '*--type=network-service*' } | "
+        "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }"
     )
     subprocess.run(
         ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
