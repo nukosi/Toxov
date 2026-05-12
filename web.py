@@ -579,6 +579,7 @@ def billing_checkout():
             "client_reference_id": str(current_user.id),
             "success_url": url_for("billing_success", _external=True) + "?session_id={CHECKOUT_SESSION_ID}",
             "cancel_url":  url_for("index", _external=True),
+            "locale": "en" if _get_lang() == "en" else "ja",
         }
         if user_data.get("stripe_customer_id"):
             params["customer"] = user_data["stripe_customer_id"]
