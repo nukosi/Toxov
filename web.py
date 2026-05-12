@@ -547,9 +547,19 @@ def tokusho():
     return render_template("tokusho.html")
 
 
+@app.route("/tokusho-en")
+def tokusho_en():
+    return render_template("tokusho_en.html")
+
+
 @app.route("/privacy")
 def privacy():
     return render_template("privacy.html")
+
+
+@app.route("/privacy-en")
+def privacy_en():
+    return render_template("privacy_en.html")
 
 
 @app.route("/billing/checkout", methods=["POST"])
