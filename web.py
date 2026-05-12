@@ -28,7 +28,7 @@ from translations import get_t
 
 PRESET_SITES = [
     {
-        "category": "動画",
+        "category": "cat_video",
         "collapsed": False,
         "sites": [
             {"name": "YouTube",  "domains": ["youtube.com", "www.youtube.com", "youtu.be"]},
@@ -38,7 +38,7 @@ PRESET_SITES = [
         ],
     },
     {
-        "category": "SNS",
+        "category": "cat_sns",
         "collapsed": False,
         "sites": [
             {"name": "X",          "domains": ["x.com", "twitter.com"]},
@@ -50,7 +50,7 @@ PRESET_SITES = [
         ],
     },
     {
-        "category": "成人向け",
+        "category": "cat_adult",
         "collapsed": True,
         "sites": [
             {"name": "Pornhub", "domains": ["pornhub.com"]},

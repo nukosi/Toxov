@@ -296,7 +296,7 @@ details > summary::-webkit-details-marker { display: none; }
 
       {% for cat in presets %}
         {% if not cat.collapsed %}
-          <p style="font-size:.72rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:8px;">{{ cat.category }}</p>
+          <p style="font-size:.72rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:8px;">{{ t[cat.category] }}</p>
           <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; justify-content:center;">
             {% for site in cat.sites %}
             <button type="button" class="preset-btn" data-domains="{{ site.domains|join(',') }}" onclick="togglePreset(this)">
