@@ -10,3 +10,4 @@ gunicorn
 requests
 resend
 stripe
+sentry-sdk[flask]

@@ -9,6 +9,17 @@ import datetime
 import secrets
 import logging
 import stripe
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+
+_sentry_dsn = os.environ.get("SENTRY_DSN", "")
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        integrations=[FlaskIntegration()],
+        traces_sample_rate=0.1,  # リクエストの10%でパフォーマンス計測
+        send_default_pii=False,  # メアド等の個人情報は送らない
+    )
 from database import (init_db, load_config, save_config,
                       verify_password, create_user, get_user_by_id, get_user_by_token,
                       set_emergency_unblock, add_event_log, get_event_logs, get_streak,
