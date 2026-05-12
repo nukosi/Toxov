@@ -562,6 +562,16 @@ def privacy_en():
     return render_template("privacy_en.html")
 
 
+@app.route("/terms")
+def terms():
+    return render_template("terms.html")
+
+
+@app.route("/terms-en")
+def terms_en():
+    return render_template("terms_en.html")
+
+
 @app.route("/billing/checkout", methods=["POST"])
 @login_required
 def billing_checkout():
