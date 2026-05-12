@@ -91,6 +91,7 @@ STRIPE_PRICE_YEARLY    = os.environ.get("STRIPE_PRICE_YEARLY", "")
 STRIPE_PRICE_EARLYBIRD = os.environ.get("STRIPE_PRICE_EARLYBIRD", "")
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
+    stripe.timeout = 15
 
 # RailwayサーバーはUTCなので、表示・判定にはJSTに変換して使う
 JST = datetime.timezone(datetime.timedelta(hours=9))
@@ -543,6 +544,7 @@ def billing_checkout():
         elif user_data.get("email"):
             params["customer_email"] = user_data["email"]
         logging.warning(f"[checkout] calling stripe. customer={params.get('customer') or params.get('customer_email')}")
+        print(f"[checkout] calling stripe", flush=True)
         session = stripe.checkout.Session.create(**params)
         logging.warning(f"[checkout] redirect to: {session.url[:80] if session.url else 'NONE'}")
         return redirect(session.url, 303)
