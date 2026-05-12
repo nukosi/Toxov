@@ -34,6 +34,59 @@ POLL_INTERVAL = 30  # seconds
 # 全APIリクエストに付与する認証ヘッダー
 _API_HEADERS = {"X-Toxov-Key": AGENT_SECRET}
 
+STRINGS = {
+    "ja": {
+        "setup_title":      "Toxov セットアップ",
+        "setup_prompt":     "Webサイトの「PC連携」に表示されている\n6文字のコードを入力してください:",
+        "err_title":        "エラー",
+        "err_no_code":      "コードが入力されませんでした。",
+        "err_bad_code":     "コードが正しくありません。再度入力してください。",
+        "setup_done_title": "Toxov セットアップ完了",
+        "setup_done_msg":   "設定が完了しました！\nPC起動時に自動でブロックが動作します。",
+        "status_blocking":  "ブロック中",
+        "status_unblocked": "解除中",
+        "status_starting":  "起動中...",
+        "menu_add_app":     "アプリを追加",
+        "menu_quit":        "終了",
+        "ps_form_title":    "ブロックするアプリを選択",
+        "ps_form_hint":     "ブロックしたいアプリを起動してからこの一覧で選んでください",
+        "ps_btn_add":       "追加",
+        "notify_added":     "追加: {name}",
+        "notify_add_fail":  "追加に失敗しました（上限に達している可能性があります）",
+        "notify_reblock":   "再ブロック完了",
+        "notify_block_start": "ブロック開始  {comment}",
+        "notify_block_end":   "ブロック終了  {comment}",
+        "log_emergency":    "緊急解除 実行",
+        "log_block":        "ブロック 実行",
+        "log_unblock":      "解除 実行",
+    },
+    "en": {
+        "setup_title":      "Toxov Setup",
+        "setup_prompt":     'Enter the 6-character code shown\non the "PC Link" page of the website:',
+        "err_title":        "Error",
+        "err_no_code":      "No code was entered.",
+        "err_bad_code":     "Incorrect code. Please try again.",
+        "setup_done_title": "Toxov Setup Complete",
+        "setup_done_msg":   "Setup complete!\nBlocking will start automatically when your PC boots.",
+        "status_blocking":  "Blocking",
+        "status_unblocked": "Unblocked",
+        "status_starting":  "Starting...",
+        "menu_add_app":     "Add App",
+        "menu_quit":        "Quit",
+        "ps_form_title":    "Select App to Block",
+        "ps_form_hint":     "Launch the app you want to block, then select it from this list",
+        "ps_btn_add":       "Add",
+        "notify_added":     "Added: {name}",
+        "notify_add_fail":  "Failed to add app (you may have reached the limit)",
+        "notify_reblock":   "Re-block complete",
+        "notify_block_start": "Blocking started  {comment}",
+        "notify_block_end":   "Blocking ended  {comment}",
+        "log_emergency":    "Emergency unblock executed",
+        "log_block":        "Block started",
+        "log_unblock":      "Block ended",
+    },
+}
+
 
 def is_admin():
     try:
@@ -48,6 +101,15 @@ def relaunch_as_admin():
         None, "runas", sys.executable, " ".join(sys.argv), None, 1
     )
     sys.exit()
+
+
+def detect_lang() -> str:
+    # GetUserDefaultUILanguage returns a LANGID; primary language 0x11 = Japanese
+    try:
+        langid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+        return "ja" if (langid & 0xFF) == 0x11 else "en"
+    except Exception:
+        return "ja"
 
 
 def ensure_single_instance():
@@ -76,34 +138,34 @@ def resolve_connect_code(code: str) -> str | None:
 
 def first_run_setup():
     # 初回起動時のみ実行。6文字の接続コードを入力させてconfig URLをAppDataに保存する
+    lang = detect_lang()
+    s = STRINGS[lang]
+
     root = tk.Tk()
     root.withdraw()
 
     while True:
         code = simpledialog.askstring(
-            "Toxov セットアップ",
-            "Webサイトの「PC連携」に表示されている\n6文字のコードを入力してください:",
+            s["setup_title"],
+            s["setup_prompt"],
             parent=root,
         )
         if not code:
-            messagebox.showerror("エラー", "コードが入力されませんでした。")
+            messagebox.showerror(s["err_title"], s["err_no_code"])
             sys.exit(1)
 
         cloud_url = resolve_connect_code(code)
         if cloud_url:
             break
-        messagebox.showerror("エラー", "コードが正しくありません。再度入力してください。")
+        messagebox.showerror(s["err_title"], s["err_bad_code"])
 
     os.makedirs(CONFIG_DIR, exist_ok=True)
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump({"cloud_url": cloud_url}, f)
+        json.dump({"cloud_url": cloud_url, "lang": lang}, f)
 
     register_autostart()
 
-    messagebox.showinfo(
-        "Toxov セットアップ完了",
-        "設定が完了しました！\nPC起動時に自動でブロックが動作します。",
-    )
+    messagebox.showinfo(s["setup_done_title"], s["setup_done_msg"])
     root.destroy()
 
 
@@ -207,10 +269,10 @@ def kill_edge_connections(log=None):
                     subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
                     killed += 1
         if log:
-            log(f"[kill_edge] NetworkService {killed}件終了")
+            log(f"[kill_edge] NetworkService {killed} terminated")
     except Exception as e:
         if log:
-            log(f"[kill_edge] エラー: {e}")
+            log(f"[kill_edge] error: {e}")
 
 
 def unblock(log=None):
@@ -230,7 +292,7 @@ def unblock(log=None):
         subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
     except Exception as e:
         if log:
-            log(f"[unblock] hostsファイルエラー: {e}")
+            log(f"[unblock] hosts error: {e}")
 
     # --- アプリ解除：Toxovという名前のファイアウォールルールをすべて削除 ---
     result = subprocess.run(
@@ -238,7 +300,7 @@ def unblock(log=None):
         capture_output=True, text=True
     )
     if log and result.returncode != 0:
-        log(f"[unblock] firewall削除エラー rc={result.returncode} {result.stderr.strip()}")
+        log(f"[unblock] firewall error rc={result.returncode} {result.stderr.strip()}")
 
 
 def notify(message):
@@ -287,13 +349,15 @@ def make_icon(blocking) -> Image.Image:
     return img
 
 
-def setup_tray(add_url: str, log) -> pystray.Icon:
+def setup_tray(add_url: str, log, lang: str) -> pystray.Icon:
+    s = STRINGS[lang]
+
     def status_text(item):
         if _tray_state["blocking"] is True:
-            return "ブロック中"
+            return s["status_blocking"]
         if _tray_state["blocking"] is False:
-            return "解除中"
-        return "起動中..."
+            return s["status_unblocked"]
+        return s["status_starting"]
 
     def add_app(icon, item):
         # 実行中プロセスをWindows FormsのListBoxで表示して選ばせる
@@ -321,7 +385,7 @@ Get-Process | ForEach-Object {
 $items = $items | Sort-Object Label
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = 'ブロックするアプリを選択'
+$form.Text = '__FORM_TITLE__'
 $form.Size = New-Object System.Drawing.Size(520, 460)
 $form.StartPosition = 'CenterScreen'
 $form.TopMost = $true
@@ -329,7 +393,7 @@ $form.FormBorderStyle = 'FixedDialog'
 $form.MaximizeBox = $false
 
 $hint = New-Object System.Windows.Forms.Label
-$hint.Text = 'ブロックしたいアプリを起動してからこの一覧で選んでください'
+$hint.Text = '__HINT_TEXT__'
 $hint.Location = New-Object System.Drawing.Point(12, 10)
 $hint.Size = New-Object System.Drawing.Size(480, 18)
 $hint.Font = New-Object System.Drawing.Font('Segoe UI', 9)
@@ -367,7 +431,7 @@ foreach ($i in $items) {
 $form.Controls.Add($lv)
 
 $ok = New-Object System.Windows.Forms.Button
-$ok.Text = '追加'
+$ok.Text = '__BTN_TEXT__'
 $ok.Location = New-Object System.Drawing.Point(420, 412)
 $ok.Size = New-Object System.Drawing.Size(72, 28)
 $ok.DialogResult = 'OK'
@@ -378,6 +442,12 @@ if ($form.ShowDialog() -eq 'OK' -and $lv.SelectedItems.Count -gt 0) {
     $lv.SelectedItems[0].Tag
 }
 """
+        ps_script = (
+            ps_script
+            .replace("__FORM_TITLE__", s["ps_form_title"])
+            .replace("__HINT_TEXT__", s["ps_form_hint"])
+            .replace("__BTN_TEXT__", s["ps_btn_add"])
+        )
         encoded = base64.b64encode(ps_script.encode("utf-16-le")).decode("ascii")
         result = subprocess.run(
             ["powershell", "-WindowStyle", "Hidden", "-EncodedCommand", encoded],
@@ -390,11 +460,11 @@ if ($form.ShowDialog() -eq 'OK' -and $lv.SelectedItems.Count -gt 0) {
             res = requests.post(add_url, json={"path": path},
                                 headers=_API_HEADERS, timeout=5)
             if res.ok:
-                notify(f"追加: {os.path.basename(path)}")
+                notify(s["notify_added"].format(name=os.path.basename(path)))
             else:
-                notify("追加に失敗しました（上限に達している可能性があります）")
+                notify(s["notify_add_fail"])
         except Exception as e:
-            log(f"アプリ追加エラー: {e}")
+            log(f"add app error: {e}")
 
     def quit_action(icon, item):
         # 終了時にhostsとファイアウォールを掃除してからアイコンを閉じる
@@ -404,9 +474,9 @@ if ($form.ShowDialog() -eq 'OK' -and $lv.SelectedItems.Count -gt 0) {
     menu = pystray.Menu(
         pystray.MenuItem(status_text, None, enabled=False),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem("アプリを追加", add_app),
+        pystray.MenuItem(s["menu_add_app"], add_app),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem("終了", quit_action),
+        pystray.MenuItem(s["menu_quit"], quit_action),
     )
     return pystray.Icon("Toxov", make_icon(False), "Toxov", menu)
 
@@ -422,15 +492,16 @@ def config_stream(url, log):
             response.raise_for_status()
             yield response.json()
         except Exception as e:
-            log(f"エラー: {e}")
+            log(f"error: {e}")
         time.sleep(POLL_INTERVAL)
 
 
-def apply_config(config, current_state, last_version, log):
+def apply_config(config, current_state, last_version, log, lang="ja"):
     """
     ローカル判定のみ。サーバーの時刻・状態に依存しない。
     戻り値: (new_state, new_last_version, events)
     """
+    s              = STRINGS[lang]
     version        = config.get("version")
     emergency      = config.get("emergency_unblock", False)
     # versionが変わったときだけblock()を呼び直してサイト一覧の変更を反映する
@@ -444,7 +515,7 @@ def apply_config(config, current_state, last_version, log):
             unblock(log)
         # current_state が True のときだけログに残す（起動時の None → False は記録しない）
         if current_state is True:
-            log("緊急解除 実行")
+            log(s["log_emergency"])
             events.append("emergency_unblock")
         return False, version, events
 
@@ -455,7 +526,7 @@ def apply_config(config, current_state, last_version, log):
             block(config.get("sites", []), config.get("apps", []))
         # False → True の遷移のみ記録（起動時の None → True は記録しない）
         if current_state is False:
-            log("ブロック 実行")
+            log(s["log_block"])
             events.append("block_start")
         return True, version, events
     else:
@@ -463,7 +534,7 @@ def apply_config(config, current_state, last_version, log):
             unblock(log)
         # True → False の遷移のみ記録（起動時の None → False は記録しない）
         if current_state is True:
-            log("解除 実行")
+            log(s["log_unblock"])
             events.append("block_end")
         return False, version, events
 
@@ -491,6 +562,8 @@ def main():
 
     local     = load_local_config()
     cloud_url = local["cloud_url"]
+    lang      = local.get("lang", "ja")
+    s         = STRINGS[lang]
 
     LOG_FILE = os.path.join(CONFIG_DIR, "agent.log")
 
@@ -501,14 +574,14 @@ def main():
 
     # ログにはトークン末尾8文字のみ記録してフルトークンの漏洩を防ぐ
     masked_url = cloud_url[:-8] + "..." + cloud_url[-4:] if len(cloud_url) > 12 else "***"
-    log(f"起動 URL={masked_url}")
+    log(f"start URL={masked_url}")
 
     # config URLからlog・アプリ追加のURLを導出する（トークンは共通）
     log_url = cloud_url.replace("/api/config/", "/api/log/")
     add_url = cloud_url.replace("/api/config/", "/api/apps/add/")
 
     # トレイアイコンをメインスレッドで動かすため、ポーリングループを別スレッドに移す
-    tray = setup_tray(add_url, log)
+    tray = setup_tray(add_url, log, lang)
 
     def polling_loop():
         current_state  = None
@@ -517,7 +590,7 @@ def main():
         for config in config_stream(cloud_url, log):
             emergency = config.get("emergency_unblock", False)
             current_state, last_version, events = apply_config(
-                config, current_state, last_version, log
+                config, current_state, last_version, log, lang
             )
             # ブロック状態をトレイアイコンとメニューテキストに反映する
             _tray_state["blocking"] = current_state
@@ -531,11 +604,11 @@ def main():
                 if event == "block_start":
                     if prev_emergency:
                         kill_edge_connections(log)
-                        notify("再ブロック完了")
+                        notify(s["notify_reblock"])
                     else:
-                        notify(f"ブロック開始  {get_comment('block_start')}")
+                        notify(s["notify_block_start"].format(comment=get_comment("block_start", lang)))
                 elif event == "block_end":
-                    notify(f"ブロック終了  {get_comment('block_end')}")
+                    notify(s["notify_block_end"].format(comment=get_comment("block_end", lang)))
                 try:
                     requests.post(log_url, json={"event": event},
                                   headers=_API_HEADERS, timeout=5)
