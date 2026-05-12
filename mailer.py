@@ -36,6 +36,50 @@ def send_otp_email(to_email: str, code: str) -> bool:
         return False
 
 
+def send_contact_email(name: str, from_email: str, message: str, lang: str = "ja") -> bool:
+    """お問い合わせフォームの内容を toxovmail@gmail.com に転送する。"""
+    if not RESEND_API_KEY:
+        return False
+    name_label    = "名前" if lang == "ja" else "Name"
+    email_label   = "メールアドレス" if lang == "ja" else "Email"
+    message_label = "内容" if lang == "ja" else "Message"
+    subject = f"[Toxov お問い合わせ] {name or from_email}" if lang == "ja" else f"[Toxov Contact] {name or from_email}"
+    import html as _html
+    safe_name    = _html.escape(name or "—")
+    safe_email   = _html.escape(from_email)
+    safe_message = _html.escape(message).replace("\n", "<br>")
+    payload = {
+        "from":     FROM_EMAIL,
+        "to":       ["toxovmail@gmail.com"],
+        "reply_to": from_email,
+        "subject":  subject,
+        "html": f"""
+<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a">
+  <h2 style="margin-bottom:20px">お問い合わせ / Contact</h2>
+  <table style="border-collapse:collapse;width:100%">
+    <tr><td style="padding:8px 16px 8px 0;color:#555;white-space:nowrap"><strong>{name_label}</strong></td>
+        <td style="padding:8px 0">{safe_name}</td></tr>
+    <tr><td style="padding:8px 16px 8px 0;color:#555;white-space:nowrap"><strong>{email_label}</strong></td>
+        <td style="padding:8px 0">{safe_email}</td></tr>
+  </table>
+  <hr style="margin:16px 0;border:none;border-top:1px solid #eee">
+  <p style="color:#555;margin-bottom:8px"><strong>{message_label}</strong></p>
+  <p style="line-height:1.7">{safe_message}</p>
+</div>
+""",
+    }
+    try:
+        res = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=10,
+        )
+        return res.status_code in (200, 201)
+    except Exception:
+        return False
+
+
 def send_password_reset(to_email: str, reset_url: str) -> bool:
     """パスワードリセットメールをResend経由で送信する。成功ならTrue。"""
     if not RESEND_API_KEY:

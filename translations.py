@@ -42,6 +42,7 @@ TRANSLATIONS = {
         "nav_billing": "サブスク",
         "nav_log": "ログ",
         "nav_profile": "プロフィール",
+        "nav_contact": "お問い合わせ",
         "nav_logout": "ログアウト",
         "nav_admin": "開発者",
 
@@ -203,6 +204,7 @@ TRANSLATIONS = {
         "nav_billing": "Subscription",
         "nav_log": "Log",
         "nav_profile": "Profile",
+        "nav_contact": "Contact",
         "nav_logout": "Log out",
         "nav_admin": "Developer",
 

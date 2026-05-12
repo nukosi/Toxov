@@ -23,7 +23,7 @@ from database import (init_db, load_config, save_config,
                       set_otp, verify_otp)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
-from mailer import send_password_reset, send_otp_email
+from mailer import send_password_reset, send_otp_email, send_contact_email
 from translations import get_t
 
 PRESET_SITES = [
@@ -570,6 +570,62 @@ def terms():
 @app.route("/terms-en")
 def terms_en():
     return render_template("terms_en.html")
+
+
+# スパム防止用: {ip: last_submit_timestamp}
+_contact_rate: dict = {}
+
+def _check_contact_rate(ip: str) -> bool:
+    """60秒以内に同一IPから送信済みならFalseを返す。"""
+    import time
+    now = time.time()
+    last = _contact_rate.get(ip, 0)
+    if now - last < 60:
+        return False
+    _contact_rate[ip] = now
+    return True
+
+
+@app.route("/contact", methods=["GET", "POST"])
+def contact():
+    sent = error = None
+    name = email = message = None
+    if request.method == "POST":
+        name    = request.form.get("name", "").strip()[:100]
+        email   = request.form.get("email", "").strip()[:200]
+        message = request.form.get("message", "").strip()[:3000]
+        if not email or "@" not in email:
+            error = "メールアドレスを正しく入力してください。"
+        elif not message:
+            error = "お問い合わせ内容を入力してください。"
+        elif not _check_contact_rate(request.remote_addr):
+            error = "送信が連続しています。しばらく待ってから再度お試しください。"
+        else:
+            send_contact_email(name, email, message, lang="ja")
+            sent = True
+    return render_template("contact.html", sent=sent, error=error,
+                           name=name, email=email, message=message)
+
+
+@app.route("/contact-en", methods=["GET", "POST"])
+def contact_en():
+    sent = error = None
+    name = email = message = None
+    if request.method == "POST":
+        name    = request.form.get("name", "").strip()[:100]
+        email   = request.form.get("email", "").strip()[:200]
+        message = request.form.get("message", "").strip()[:3000]
+        if not email or "@" not in email:
+            error = "Please enter a valid email address."
+        elif not message:
+            error = "Please enter your message."
+        elif not _check_contact_rate(request.remote_addr):
+            error = "Too many requests. Please wait a moment and try again."
+        else:
+            send_contact_email(name, email, message, lang="en")
+            sent = True
+    return render_template("contact_en.html", sent=sent, error=error,
+                           name=name, email=email, message=message)
 
 
 @app.route("/billing/checkout", methods=["POST"])
