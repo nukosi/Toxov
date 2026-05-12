@@ -1,24 +1,24 @@
 {% extends "base_auth.html" %}
-{% block title %}プロフィール - Toxov{% endblock %}
+{% block title %}{{ t.profile_title }} - Toxov{% endblock %}
 {% block content %}
-<h1 class="title">プロフィール</h1>
+<h1 class="title">{{ t.profile_title }}</h1>
 {% if error %}<div class="err">{{ error }}</div>{% endif %}
 {% if message %}<div class="ok" style="margin-bottom:16px;">{{ message }}</div>{% endif %}
 
 <div style="background:var(--bg-in); border-radius:var(--rs); padding:10px 13px; font-size:.88rem; color:var(--muted); margin-bottom:20px;">
-  登録メールアドレス：
+  {{ t.profile_email_label }}
   {% if email %}
     <span style="color:var(--text); font-weight:500;">{{ email }}</span>
   {% else %}
-    <span style="color:var(--dim);">未設定</span>
+    <span style="color:var(--dim);">{{ t.profile_email_none }}</span>
   {% endif %}
 </div>
 
 <form method="post">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label>{% if email %}新しいメールアドレス{% else %}メールアドレスを登録{% endif %}</label>
+  <label>{% if email %}{{ t.profile_email_update }}{% else %}{{ t.profile_email_add }}{% endif %}</label>
   <input type="email" name="email" autofocus placeholder="{{ email or '' }}" maxlength="200">
-  <button type="submit" class="submit">保存</button>
+  <button type="submit" class="submit">{{ t.btn_save }}</button>
 </form>
-<a href="/" class="link" style="margin-top:14px;">ダッシュボードに戻る</a>
+<a href="/" class="link" style="margin-top:14px;">{{ t.link_dashboard }}</a>
 {% endblock %}

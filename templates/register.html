@@ -1,18 +1,18 @@
 {% extends "base_auth.html" %}
-{% block title %}新規登録 - Toxov{% endblock %}
+{% block title %}{{ t.register_title }} - Toxov{% endblock %}
 {% block content %}
-<h1 class="title">新規登録</h1>
+<h1 class="title">{{ t.register_title }}</h1>
 {% if error %}<div class="err">{{ error }}</div>{% endif %}
 <form method="post">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label>ユーザー名</label>
+  <label>{{ t.username }}</label>
   <input type="text" name="username" autofocus required maxlength="50">
-  <label>パスワード</label>
+  <label>{{ t.password }}</label>
   <input type="password" name="password" required maxlength="200">
-  <label>メールアドレス <span style="color:var(--dim); font-size:.76rem;">（任意・パスワードリセットに使用）</span></label>
+  <label>{{ t.email }} <span style="color:var(--dim); font-size:.76rem;">{{ t.email_optional }}</span></label>
   <input type="email" name="email" maxlength="200">
-  <button type="submit" class="submit">アカウントを作成</button>
+  <button type="submit" class="submit">{{ t.btn_register }}</button>
 </form>
-<a href="/login" class="link" style="margin-top:16px;">すでにアカウントをお持ちの方</a>
-<a href="/download" class="link" style="margin-top:10px; padding:10px; background:var(--bg-input); border-radius:var(--rs); color:var(--accent); font-size:.88rem;">Toxov.exe をダウンロード</a>
+<a href="/login" class="link" style="margin-top:16px;">{{ t.link_already_have_account }}</a>
+<a href="https://github.com/nukosi/toxov-releases/releases/download/v1.2.0/Toxov.exe" class="link" style="margin-top:10px; padding:10px; background:var(--bg-input); border-radius:var(--rs); color:var(--accent); font-size:.88rem;">{{ t.download_link }}</a>
 {% endblock %}

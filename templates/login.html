@@ -1,16 +1,16 @@
 {% extends "base_auth.html" %}
-{% block title %}ログイン - Toxov{% endblock %}
+{% block title %}{{ t.login_title }} - Toxov{% endblock %}
 {% block content %}
 <h1 class="title">Toxov</h1>
 {% if error %}<div class="err">{{ error }}</div>{% endif %}
 <form method="post">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label>ユーザー名</label>
+  <label>{{ t.username }}</label>
   <input type="text" name="username" autofocus required maxlength="50">
-  <label>パスワード</label>
+  <label>{{ t.password }}</label>
   <input type="password" name="password" required maxlength="200">
-  <button type="submit" class="submit">ログイン</button>
+  <button type="submit" class="submit">{{ t.btn_login }}</button>
 </form>
-<a href="/register" class="link" style="margin-top:16px;">新規登録はこちら</a>
-<a href="/forgot-password" class="link link-sm">パスワードを忘れた方</a>
+<a href="/register" class="link" style="margin-top:16px;">{{ t.link_register }}</a>
+<a href="/forgot-password" class="link link-sm">{{ t.link_forgot }}</a>
 {% endblock %}

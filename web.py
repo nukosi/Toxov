@@ -24,6 +24,7 @@ from database import (init_db, load_config, save_config,
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 from mailer import send_password_reset, send_otp_email
+from translations import get_t
 
 PRESET_SITES = [
     {
@@ -79,6 +80,16 @@ login_manager.login_view = "login"
 
 csrf    = CSRFProtect(app)
 limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="memory://")
+
+
+def _get_lang():
+    return flask_session.get("lang", "ja")
+
+
+@app.context_processor
+def inject_lang():
+    lang = _get_lang()
+    return {"t": get_t(lang), "lang": lang}
 
 # エージェント認証シークレット。Railway環境変数 AGENT_SECRET と agent.py の定数を同じ値にする
 AGENT_SECRET = os.environ.get("AGENT_SECRET", "")
@@ -252,6 +263,7 @@ def logout():
 
 @app.route("/en")
 def landing_en():
+    flask_session["lang"] = "en"
     eb = _earlybird_status()
     return render_template("landing_en.html",
                            earlybird_available=eb["available"],
@@ -262,8 +274,10 @@ def landing_en():
 def index():
     # 未ログインはランディングページ（言語自動判定）、ログイン済みはダッシュボード
     if not current_user.is_authenticated:
-        lang = request.accept_languages.best_match(["ja", "en"], default="ja")
-        if lang == "en":
+        if "lang" not in flask_session:
+            lang = request.accept_languages.best_match(["ja", "en"], default="ja")
+            flask_session["lang"] = lang
+        if flask_session.get("lang") == "en":
             return redirect(url_for("landing_en"))
         eb = _earlybird_status()
         return render_template("landing.html",
