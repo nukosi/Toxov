@@ -271,6 +271,7 @@ def landing_en():
 
 
 @app.route("/ja")
+@app.route("/jp")
 def landing_ja():
     flask_session["lang"] = "ja"
     return redirect(url_for("index"))
