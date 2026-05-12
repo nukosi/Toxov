@@ -546,6 +546,8 @@ def billing_checkout():
         params["customer_email"] = user_data["email"]
     try:
         session = stripe.checkout.Session.create(**params)
+        import logging
+        logging.warning(f"[checkout] redirect to: {session.url[:60] if session.url else 'NONE'}")
         return redirect(session.url, 303)
     except Exception as e:
         import logging
