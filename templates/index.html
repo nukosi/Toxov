@@ -124,6 +124,8 @@ details > summary::-webkit-details-marker { display: none; }
     <div class="banner banner-err">無料プランではサイトを{{ limits.max_sites }}件まで登録できます</div>
   {% elif error == "app_limit" %}
     <div class="banner banner-err">無料プランではアプリを{{ limits.max_apps }}件まで登録できます</div>
+  {% elif error == "session_expired" %}
+    <div class="banner banner-err">セッションの有効期限が切れました。もう一度お試しください</div>
   {% endif %}
 </div>
 
@@ -761,7 +763,7 @@ details > summary::-webkit-details-marker { display: none; }
 
   // エラー時はsettingsタブ（修正できるように）、保存成功時はhomeタブ（バナーが見えるように）
   const savedTab = sessionStorage.getItem('toxov-tab') || 'home';
-  const initialTab = {% if error %}"settings"{% elif saved %}"home"{% else %}savedTab{% endif %};
+  const initialTab = {% if error == "session_expired" %}"home"{% elif error %}"settings"{% elif saved %}"home"{% else %}savedTab{% endif %};
   showTab(initialTab);
   // URLからクエリパラメータを削除してリロード時に再表示されないようにする
   if ({{ 'true' if saved or error or payment else 'false' }}) {

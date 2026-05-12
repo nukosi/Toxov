@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, s
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 import datetime
@@ -110,6 +110,12 @@ def _earlybird_status() -> dict:
 
 # gunicornはif __name__ == "__main__"を通らないのでここで初期化する
 init_db()
+
+
+# CSRFトークン期限切れ時はフレンドリーなバナーにリダイレクト
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    return redirect(url_for("index", error="session_expired"))
 
 
 def check_agent_secret() -> bool:
