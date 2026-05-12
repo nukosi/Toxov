@@ -110,8 +110,11 @@ def first_run_setup():
 def register_autostart():
     # Windowsタスクスケジューラにログオン時の自動起動を登録する
     # RunLevel Highest = 管理者として起動（UACダイアログなし）
+    # 旧名称のタスクが残っている場合は先に削除する
     exe = sys.executable
     ps = f"""
+Unregister-ScheduledTask -TaskName 'nukosisnsblocker' -Confirm:$false -ErrorAction SilentlyContinue
+Unregister-ScheduledTask -TaskName 'CutNet' -Confirm:$false -ErrorAction SilentlyContinue
 $action   = New-ScheduledTaskAction -Execute '{exe}'
 $trigger  = New-ScheduledTaskTrigger -AtLogOn
 $principal= New-ScheduledTaskPrincipal -UserId '{os.environ["USERNAME"]}' -RunLevel Highest -LogonType Interactive
@@ -462,6 +465,14 @@ def main():
     mutex = ensure_single_instance()
     if mutex is None:
         sys.exit(0)
+
+    # 旧名称の自動起動タスクが残っていれば毎回削除する（リネーム移行対応）
+    subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "Unregister-ScheduledTask -TaskName 'nukosisnsblocker' -Confirm:$false -EA SilentlyContinue;"
+         "Unregister-ScheduledTask -TaskName 'CutNet' -Confirm:$false -EA SilentlyContinue"],
+        capture_output=True,
+    )
 
     if not os.path.exists(CONFIG_FILE):
         first_run_setup()
