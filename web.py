@@ -548,6 +548,11 @@ def profile():
     return render_template("profile.html", email=data.get("email"), message=message, error=error)
 
 
+@app.route("/sentry-test")
+def sentry_test():
+    raise Exception("Sentry test error from Toxov")
+
+
 @app.route("/download")
 def download():
     return send_from_directory("dist", "Toxov.exe", as_attachment=True)
