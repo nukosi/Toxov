@@ -3,83 +3,166 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>特定商取引法に基づく表記 - Toxov</title>
+  <title>特定商取引法に基づく表記 — Toxov</title>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f0f;
+      --bg-card: #1a1a1a;
+      --border: #2a2a2a;
+      --text: #e0e0e0;
+      --muted: #888;
+      --accent: #F97316;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0B0B0C;
-      color: #F4F4F5;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
       font-size: 14px;
-      line-height: 1.8;
-      padding: 48px 16px;
+      line-height: 1.7;
     }
-    .container { max-width: 720px; margin: 0 auto; }
-    h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 32px; color: #fff; }
-    h2 { font-size: .9rem; font-weight: 600; color: #8A8A93; text-transform: uppercase; letter-spacing: 1px; margin-top: 32px; margin-bottom: 8px; }
-    table { width: 100%; border-collapse: collapse; }
-    td { padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: top; }
-    td:first-child { width: 180px; color: #8A8A93; font-size: .84rem; padding-right: 24px; white-space: nowrap; }
-    td:last-child { color: #F4F4F5; }
-    a { color: #F97316; text-decoration: none; }
-    .back { display: inline-block; color: #8A8A93; font-size: .82rem; margin-bottom: 32px; text-decoration: none; }
-    .back:hover { color: #F4F4F5; }
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 40px;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    .nav-logo {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .container {
+      max-width: 720px;
+      margin: 60px auto;
+      padding: 0 24px 80px;
+    }
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .updated {
+      font-size: .8rem;
+      color: var(--muted);
+      margin-bottom: 40px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    tr {
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      width: 180px;
+      padding: 18px 16px 18px 0;
+      text-align: left;
+      vertical-align: top;
+      font-weight: 600;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    td {
+      padding: 18px 0;
+      vertical-align: top;
+    }
+    footer {
+      text-align: center;
+      padding: 32px;
+      font-size: .8rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--muted); text-decoration: none; margin: 0 8px; }
+    footer a:hover { color: var(--text); }
+    @media (max-width: 560px) {
+      nav { padding: 16px 20px; }
+      th { width: 120px; font-size: .82rem; }
+      td { font-size: .88rem; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <a href="/" class="back">← Toxov に戻る</a>
-    <h1>特定商取引法に基づく表記</h1>
-    <table>
-      <tr>
-        <td>販売業者</td>
-        <td>Toxov<br><span style="font-size:.8rem;color:#8A8A93;">実名は請求に応じて開示します</span></td>
-      </tr>
-      <tr>
-        <td>所在地</td>
-        <td>東京都三鷹市上連雀6丁目10-5-402</td>
-      </tr>
-      <tr>
-        <td>電話番号</td>
-        <td>080-6722-0249<br><span style="font-size:.8rem;color:#8A8A93;">お問い合わせはメールにてお願いします</span></td>
-      </tr>
-      <tr>
-        <td>メールアドレス</td>
-        <td><a href="mailto:komiyasan5@gmail.com">komiyasan5@gmail.com</a></td>
-      </tr>
-      <tr>
-        <td>販売価格</td>
-        <td>
-          月額プラン：¥1,000（税込）<br>
-          年額プラン：¥5,000（税込）<br>
-          アーリーバードプラン：¥3,000（税込・年額・期間限定）
-        </td>
-      </tr>
-      <tr>
-        <td>支払い方法</td>
-        <td>クレジットカード（Visa・Mastercard・American Express・JCB）</td>
-      </tr>
-      <tr>
-        <td>支払い時期</td>
-        <td>無料トライアル（7日間）終了後、選択したプランに応じて月次または年次で自動引き落とし</td>
-      </tr>
-      <tr>
-        <td>役務の提供時期</td>
-        <td>決済完了後、即時にPremiumプランが有効になります</td>
-      </tr>
-      <tr>
-        <td>動作環境</td>
-        <td>Windows 10 / Windows 11（64ビット）</td>
-      </tr>
-      <tr>
-        <td>返品・キャンセルについて</td>
-        <td>
-          無料トライアル期間中（7日間）にキャンセルした場合、料金は一切発生しません。<br>
-          トライアル終了後の返金はお受けできません。<br>
-          サブスクリプションはいつでもカスタマーポータルよりキャンセルでき、キャンセル後は次の更新日まで引き続きご利用いただけます。
-        </td>
-      </tr>
-    </table>
+
+<nav>
+  <a href="/" class="nav-logo">Toxov</a>
+</nav>
+
+<div class="container">
+  <h1>特定商取引法に基づく表記</h1>
+  <p class="updated">最終更新：2026年5月</p>
+
+  <table>
+    <tr>
+      <th>販売事業者名</th>
+      <td>Toxov</td>
+    </tr>
+    <tr>
+      <th>所在地</th>
+      <td>〒160-0023<br>東京都新宿区西新宿3丁目3番13号<br>西新宿水間ビル2F</td>
+    </tr>
+    <tr>
+      <th>電話番号</th>
+      <td>電話による問い合わせは受け付けておりません。<br>メールにてご連絡ください。</td>
+    </tr>
+    <tr>
+      <th>メールアドレス</th>
+      <td>toxovmail@gmail.com</td>
+    </tr>
+    <tr>
+      <th>販売価格</th>
+      <td>
+        月額プラン：¥1,000 / 月<br>
+        年額プラン：¥5,000 / 年<br>
+        アーリーバードプラン：¥3,000 / 年（限定）<br>
+        <span style="color:var(--muted); font-size:.85em;">各プランとも7日間の無料トライアルあり</span>
+      </td>
+    </tr>
+    <tr>
+      <th>商品代金以外の<br>必要料金</th>
+      <td>なし（インターネット接続料金はお客様のご負担となります）</td>
+    </tr>
+    <tr>
+      <th>支払方法</th>
+      <td>クレジットカード（Visa / Mastercard / American Express / JCB）</td>
+    </tr>
+    <tr>
+      <th>支払時期</th>
+      <td>無料トライアル終了後に初回課金。以降は契約プランに応じて毎月または毎年、自動更新にて課金されます。</td>
+    </tr>
+    <tr>
+      <th>サービス提供時期</th>
+      <td>決済完了後、即時ご利用いただけます。</td>
+    </tr>
+    <tr>
+      <th>キャンセル・<br>解約について</th>
+      <td>いつでもダッシュボードの「サブスク」タブよりキャンセルできます。解約後は契約期間終了日まで引き続きご利用いただけます。</td>
+    </tr>
+    <tr>
+      <th>返金について</th>
+      <td>デジタルサービスの性質上、原則として返金には対応しておりません。ただし、二重請求や当社側の不具合に起因する場合はこの限りではありません。</td>
+    </tr>
+    <tr>
+      <th>動作環境</th>
+      <td>Windows 10 / 11（管理者権限が必要です）</td>
+    </tr>
+  </table>
+</div>
+
+<footer>
+  <div>
+    <a href="/">ホーム</a>
+    <a href="/privacy">プライバシーポリシー</a>
+    <a href="mailto:toxovmail@gmail.com">お問い合わせ</a>
   </div>
+  <div style="margin-top:10px;">© 2026 Toxov</div>
+</footer>
+
 </body>
 </html>
