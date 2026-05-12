@@ -543,14 +543,10 @@ def billing_checkout():
             params["customer"] = user_data["stripe_customer_id"]
         elif user_data.get("email"):
             params["customer_email"] = user_data["email"]
-        logging.warning(f"[checkout] calling stripe. customer={params.get('customer') or params.get('customer_email')}")
-        print(f"[checkout] calling stripe", flush=True)
         session = stripe.checkout.Session.create(**params)
-        logging.warning(f"[checkout] redirect to: {session.url[:80] if session.url else 'NONE'}")
         return redirect(session.url, 303)
     except Exception as e:
-        logging.warning(f"[checkout] error: {type(e).__name__}: {e}")
-        return redirect(url_for("index"))
+        return f"DEBUG ERROR: {type(e).__name__}: {e}", 500
 
 
 @app.route("/billing/success")
