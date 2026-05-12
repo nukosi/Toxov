@@ -266,12 +266,24 @@ def notify(message):
 _tray_state = {"blocking": None}
 
 
+def _load_tray_base() -> Image.Image:
+    # PyInstaller bundleとスクリプト実行の両方に対応したパス解決
+    import sys
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(base, "tray_icon.png")
+    if os.path.exists(path):
+        return Image.open(path).convert("RGBA").resize((64, 64), Image.LANCZOS)
+    # フォールバック: シンプルな六角形
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    return img
+
+
 def make_icon(blocking) -> Image.Image:
-    # ブロック中は赤、解除中は緑のシンプルな円アイコン
-    img  = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    # Toxovロゴをベースに、右下にブロック状態の小ドットを重ねる
+    img  = _load_tray_base().copy()
     draw = ImageDraw.Draw(img)
     color = "#ff4444" if blocking else "#44cc44"
-    draw.ellipse([6, 6, 58, 58], fill=color)
+    draw.ellipse([44, 44, 60, 60], fill=color, outline="#000000", width=1)
     return img
 
 

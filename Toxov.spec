@@ -5,7 +5,7 @@ a = Analysis(
     ['agent.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('tray_icon.png', '.')],
     hiddenimports=['pystray._win32'],
     hookspath=[],
     hooksconfig={},
