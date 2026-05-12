@@ -543,10 +543,20 @@ def billing_checkout():
             params["customer"] = user_data["stripe_customer_id"]
         elif user_data.get("email"):
             params["customer_email"] = user_data["email"]
-        session = stripe.checkout.Session.create(**params)
+        try:
+            session = stripe.checkout.Session.create(**params)
+        except stripe.error.InvalidRequestError as e:
+            # テストモードの顧客IDが本番で使えない場合はIDを外して再試行
+            if "similar object exists in test mode" in str(e):
+                params.pop("customer", None)
+                if user_data.get("email"):
+                    params["customer_email"] = user_data["email"]
+                session = stripe.checkout.Session.create(**params)
+            else:
+                raise
         return redirect(session.url, 303)
     except Exception as e:
-        return f"DEBUG ERROR: {type(e).__name__}: {e}", 500
+        return redirect(url_for("index"))
 
 
 @app.route("/billing/success")
