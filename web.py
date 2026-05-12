@@ -525,7 +525,6 @@ def privacy():
 def billing_checkout():
     price_id    = request.form.get("price_id", "").strip()
     valid_prices = {STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY, STRIPE_PRICE_EARLYBIRD} - {""}
-    logging.warning(f"[checkout] price_id={price_id!r} valid={valid_prices} key={'OK' if STRIPE_SECRET_KEY else 'MISSING'}")
     if price_id not in valid_prices or not STRIPE_SECRET_KEY:
         return redirect(url_for("index"))
     try:
