@@ -250,10 +250,21 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/en")
+def landing_en():
+    eb = _earlybird_status()
+    return render_template("landing_en.html",
+                           earlybird_available=eb["available"],
+                           earlybird_remaining=eb["remaining"])
+
+
 @app.route("/")
 def index():
-    # 未ログインはランディングページ、ログイン済みはダッシュボードを返す
+    # 未ログインはランディングページ（言語自動判定）、ログイン済みはダッシュボード
     if not current_user.is_authenticated:
+        lang = request.accept_languages.best_match(["ja", "en"], default="ja")
+        if lang == "en":
+            return redirect(url_for("landing_en"))
         eb = _earlybird_status()
         return render_template("landing.html",
                                earlybird_available=eb["available"],
