@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Toxov — インターネットを断ち切れ</title>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon.png">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -218,6 +221,16 @@
       font-size: 0.8rem;
       color: #aaa;
     }
+    .step-img {
+      margin-top: 12px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .step-img img {
+      width: 100%;
+      display: block;
+    }
 
     /* CTA */
     .cta {
@@ -351,6 +364,15 @@
         <div class="plan-trial">クレジットカード登録後、7日間無料</div>
       </div>
 
+      <!-- 年額 -->
+      <div class="plan-card">
+        <div class="plan-name">年額</div>
+        <div class="plan-price">¥5,000<span>/年</span></div>
+        <div class="plan-desc">月払いより<strong style="color:#F97316;">58%</strong>お得</div>
+        <a href="/register" class="plan-cta ghost">7日間無料で試す</a>
+        <div class="plan-trial">クレジットカード登録後、7日間無料</div>
+      </div>
+
     </div>
 
     <!-- Premium特典 -->
@@ -374,6 +396,15 @@
         <h3>Smart App Control をオフにする</h3>
         <p>Windowsセキュリティ → アプリとブラウザーの制御 → Smart App Control → <strong>オフ</strong><br>
         ※ 署名なし.exeの実行に必要です。一度オフにすれば変更不要です。</p>
+        <div class="step-img">
+          <img src="/static/sac_step1.png" alt="Windowsセキュリティを検索する" loading="lazy">
+        </div>
+        <div class="step-img" style="margin-top:8px;">
+          <img src="/static/sac_step2.png" alt="アプリとブラウザーコントロールを開く" loading="lazy">
+        </div>
+        <div class="step-img" style="margin-top:8px;">
+          <img src="/static/sac_step3.png" alt="スマートアプリコントロールをオフにする" loading="lazy">
+        </div>
       </div>
     </div>
 
