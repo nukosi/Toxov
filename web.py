@@ -291,7 +291,7 @@ def index():
     streak       = get_streak(current_user.id)
     semoji       = streak_emoji(streak)
     phase        = get_phase(streak, has_emergency_history(current_user.id))
-    comment      = get_comment(phase)
+    comment      = get_comment(phase, _get_lang())
     weekly_rate  = get_success_rate(current_user.id, 7)
     monthly_rate = get_success_rate(current_user.id, 30)
     points       = get_user_points(current_user.id)
