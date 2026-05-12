@@ -276,16 +276,6 @@ def landing_ja():
     return redirect(url_for("index"))
 
 
-@app.route("/tokusho")
-def tokusho():
-    return render_template("tokusho.html")
-
-
-@app.route("/privacy")
-def privacy():
-    return render_template("privacy.html")
-
-
 @app.route("/")
 def index():
     # 未ログインはランディングページ（言語自動判定）、ログイン済みはダッシュボード
