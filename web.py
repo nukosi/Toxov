@@ -7,6 +7,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import os
 import datetime
 import secrets
+import logging
 import stripe
 from database import (init_db, load_config, save_config,
                       verify_password, create_user, get_user_by_id, get_user_by_token,
@@ -523,35 +524,30 @@ def privacy():
 def billing_checkout():
     price_id    = request.form.get("price_id", "").strip()
     valid_prices = {STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY, STRIPE_PRICE_EARLYBIRD} - {""}
-    import logging
     logging.warning(f"[checkout] price_id={price_id!r} valid={valid_prices} key={'OK' if STRIPE_SECRET_KEY else 'MISSING'}")
     if price_id not in valid_prices or not STRIPE_SECRET_KEY:
         return redirect(url_for("index"))
-    user_data = get_user_by_id(current_user.id)
-    params = {
-        "payment_method_types": ["card"],
-        "line_items": [{"price": price_id, "quantity": 1}],
-        "mode": "subscription",
-        # 7日間の無料トライアルをすべてのプランに付与する
-        "subscription_data": {"trial_period_days": 7},
-        # WebhookでユーザーIDを特定するためにclient_reference_idを使う
-        "client_reference_id": str(current_user.id),
-        "success_url": url_for("billing_success", _external=True) + "?session_id={CHECKOUT_SESSION_ID}",
-        "cancel_url":  url_for("index", _external=True),
-    }
-    # 既存のStripeカスタマーIDがあれば再利用する（重複カスタマー防止）
-    if user_data.get("stripe_customer_id"):
-        params["customer"] = user_data["stripe_customer_id"]
-    elif user_data.get("email"):
-        params["customer_email"] = user_data["email"]
     try:
+        user_data = get_user_by_id(current_user.id)
+        params = {
+            "payment_method_types": ["card"],
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "mode": "subscription",
+            "subscription_data": {"trial_period_days": 7},
+            "client_reference_id": str(current_user.id),
+            "success_url": url_for("billing_success", _external=True) + "?session_id={CHECKOUT_SESSION_ID}",
+            "cancel_url":  url_for("index", _external=True),
+        }
+        if user_data.get("stripe_customer_id"):
+            params["customer"] = user_data["stripe_customer_id"]
+        elif user_data.get("email"):
+            params["customer_email"] = user_data["email"]
+        logging.warning(f"[checkout] calling stripe. customer={params.get('customer') or params.get('customer_email')}")
         session = stripe.checkout.Session.create(**params)
-        import logging
-        logging.warning(f"[checkout] redirect to: {session.url[:60] if session.url else 'NONE'}")
+        logging.warning(f"[checkout] redirect to: {session.url[:80] if session.url else 'NONE'}")
         return redirect(session.url, 303)
     except Exception as e:
-        import logging
-        logging.warning(f"[checkout] Stripe API error: {e}")
+        logging.warning(f"[checkout] error: {type(e).__name__}: {e}")
         return redirect(url_for("index"))
 
 
