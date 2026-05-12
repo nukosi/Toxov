@@ -270,6 +270,12 @@ def landing_en():
                            earlybird_remaining=eb["remaining"])
 
 
+@app.route("/ja")
+def landing_ja():
+    flask_session["lang"] = "ja"
+    return redirect(url_for("index"))
+
+
 @app.route("/")
 def index():
     # 未ログインはランディングページ（言語自動判定）、ログイン済みはダッシュボード
