@@ -544,8 +544,13 @@ def billing_checkout():
         params["customer"] = user_data["stripe_customer_id"]
     elif user_data.get("email"):
         params["customer_email"] = user_data["email"]
-    session = stripe.checkout.Session.create(**params)
-    return redirect(session.url, 303)
+    try:
+        session = stripe.checkout.Session.create(**params)
+        return redirect(session.url, 303)
+    except Exception as e:
+        import logging
+        logging.warning(f"[checkout] Stripe API error: {e}")
+        return redirect(url_for("index"))
 
 
 @app.route("/billing/success")
