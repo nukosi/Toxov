@@ -86,9 +86,9 @@ AGENT_SECRET = os.environ.get("AGENT_SECRET", "")
 # Stripe設定。Railway環境変数に設定してから使う
 STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET  = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_PRICE_MONTHLY   = os.environ.get("STRIPE_PRICE_MONTHLY", "")
-STRIPE_PRICE_YEARLY    = os.environ.get("STRIPE_PRICE_YEARLY", "")
-STRIPE_PRICE_EARLYBIRD = os.environ.get("STRIPE_PRICE_EARLYBIRD", "")
+STRIPE_PRICE_MONTHLY   = os.environ.get("STRIPE_PRICE_MONTHLY", "").strip()
+STRIPE_PRICE_YEARLY    = os.environ.get("STRIPE_PRICE_YEARLY", "").strip()
+STRIPE_PRICE_EARLYBIRD = os.environ.get("STRIPE_PRICE_EARLYBIRD", "").strip()
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
     stripe.timeout = 15
