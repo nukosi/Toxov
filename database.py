@@ -343,10 +343,10 @@ def get_streak(user_id):
             .order_by(EventLog.id.desc())
             .first()
         )
-        # 緊急解除したことがある場合：最後の緊急解除から何日経つか
+        # 緊急解除したことがある場合：緊急解除した日を失敗日とし翌日から積み上げる（カレンダー日付ベース）
         if last_emergency:
-            return max(0, (now - last_emergency.created_at).days)
-        # 一度も緊急解除していない場合：最初のブロック開始から何日経つか
+            return max(0, (now.date() - last_emergency.created_at.date()).days)
+        # 一度も緊急解除していない場合：最初のブロック開始日から何日経つか
         first_block = (
             session.query(EventLog)
             .filter_by(user_id=user_id, event="block_start")
@@ -354,7 +354,7 @@ def get_streak(user_id):
             .first()
         )
         if first_block:
-            return (now - first_block.created_at).days
+            return (now.date() - first_block.created_at.date()).days
         return 0
 
 
@@ -546,14 +546,14 @@ def _compute_streak_in_session(session, user_id, now):
         .first()
     )
     if last_emergency:
-        return max(0, (now - last_emergency.created_at).days)
+        return max(0, (now.date() - last_emergency.created_at.date()).days)
     first_block = (
         session.query(EventLog)
         .filter_by(user_id=user_id, event="block_start")
         .order_by(EventLog.id.asc())
         .first()
     )
-    return (now - first_block.created_at).days if first_block else 0
+    return (now.date() - first_block.created_at.date()).days if first_block else 0
 
 
 def _record_point(session, pts, user_id, amount, reason, now, affect_lifetime):
