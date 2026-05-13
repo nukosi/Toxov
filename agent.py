@@ -574,7 +574,11 @@ def main():
 
     # ログにはトークン末尾8文字のみ記録してフルトークンの漏洩を防ぐ
     masked_url = cloud_url[:-8] + "..." + cloud_url[-4:] if len(cloud_url) > 12 else "***"
-    log(f"start URL={masked_url}")
+    log(f"start URL={masked_url} exe={sys.executable}")
+
+    # exeの場所が変わっても正しく自動起動するよう毎回タスクを更新する
+    register_autostart()
+    log("autostart re-registered")
 
     # config URLからlog・アプリ追加のURLを導出する（トークンは共通）
     log_url = cloud_url.replace("/api/config/", "/api/log/")
@@ -624,4 +628,15 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        log_path = os.path.join(os.environ.get("APPDATA", ""), "Toxov", "agent.log")
+        try:
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"[CRASH] {e}\n{traceback.format_exc()}\n")
+        except Exception:
+            pass
+        raise
