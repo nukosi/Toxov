@@ -1,104 +1,115 @@
 # Toxov
 
-指定した時間帯にWebサイト・アプリを自動でブロックするインターネットデトックスツールです。
+> 🇯🇵 日本語版READMEは [README_ja.md](README_ja.md) をご覧ください。
 
-**English:** See [toxov.net/en](https://toxov.net/en)
+**Toxov** is a Windows app that automatically blocks distracting websites and apps during scheduled time periods — with no easy way around it.
+
+![Hero](https://toxov.net/static/ogp.png)
 
 ---
 
-## 機能
+## Why Toxov?
 
-- ブロックする時間帯・サイト・アプリをWebサイトから設定
-- PC起動時に自動でブロックが動作（タスクスケジューラ登録）
-- 緊急解除ボタン（Webサイトから操作）
-- ブロック・解除のログ確認
-- 緊急解除なしの継続日数（ストリーク）・シールド機能
-- ポイント・シーズンランキング（Seed → Flame → Iron → Gold → Diamond）
-- 上位ランキング表示（プレミアム限定）
-- 二重起動防止
-- 日本語 / 英語 対応
+Browser extensions and app timers all have workarounds. You can just open a different browser or disable the extension when you really want to.
 
-## 料金プラン
+Toxov works differently. It rewrites the **hosts file** and adds **Windows Firewall rules** directly, so there's no quick escape hatch. You set your schedule once from a web dashboard, and it runs silently in the background every time your PC starts.
 
-| プラン | 価格 |
+---
+
+## Screenshots
+
+> 📸 *Dashboard screenshot coming soon*
+
+> 🎬 *Demo video (YouTube blocked in real time) coming soon*
+
+---
+
+## Features
+
+- **Schedule-based blocking** — set start/end times from your browser, blocking runs automatically
+- **Websites + apps** — block sites via hosts file and apps via Windows Firewall
+- **No easy workarounds** — works across all browsers, no extension to disable
+- **Streak tracking** — consecutive clean days without emergency unblock
+- **Points & season ranking** — stay motivated with a leaderboard
+- **Emergency unblock** — available when you truly need it, with a point penalty
+- **Streak shield** — protect your streak once per month (Premium)
+- **Bilingual** — Japanese and English UI
+
+---
+
+## Download
+
+**[⬇ Download Toxov.exe (latest)](https://github.com/nukosi/Toxov/releases/latest/download/Toxov.exe)**
+
+Or visit [toxov.net](https://toxov.net) for the full setup guide.
+
+**System requirements:** Windows 10 / 11 (64-bit), administrator privileges required
+
+---
+
+## Getting Started
+
+1. Create an account at [toxov.net](https://toxov.net)
+2. Set your block schedule, sites, and apps from the dashboard
+3. Download and run `Toxov.exe`
+4. Enter the 6-character code shown on the **PC Link** page
+5. Done — blocking starts automatically on every boot
+
+---
+
+## Pricing
+
+| Plan | Price |
 |---|---|
-| 月額 | ¥1,000 / 月 |
-| 年額 | ¥5,000 / 年 |
-| アーリーバード | ¥3,000 / 年（先着限定） |
+| Monthly | ¥1,000 / month |
+| Yearly | ¥5,000 / year |
+| Early Bird | ¥3,000 / year (limited) |
 
-全プラン7日間無料トライアルあり。
-
-## 使い方
-
-### 1. アカウント登録
-
-[toxov.net](https://toxov.net) にアクセスして新規登録します。
-
-### 2. 設定
-
-ログイン後、ブロックしたい時間帯・サイト・アプリを入力して「設定を保存」します。
-
-**サイトの記述例：**
-```
-youtube.com
-www.youtube.com
-x.com
-www.x.com
-```
-
-**アプリの記述例（実行ファイルのフルパス）：**
-```
-C:\Program Files (x86)\Steam\steamapps\common\ゲーム名\game.exe
-```
-
-Steamゲームのパスを調べるには：Steam ライブラリ → ゲームを右クリック → プロパティ → ローカルファイル → 参照
-
-### 3. Toxov.exe をダウンロード・起動
-
-[最新版をダウンロード](https://github.com/nukosi/Toxov/releases/latest/download/Toxov.exe)
-
-1. 起動するとUAC（管理者権限）の確認が出るので「はい」をクリック
-2. 初回起動時にWebサイトの「PC連携」画面に表示される **6文字のコード** を入力
-3. セットアップ完了後、PC起動時に自動でブロックが動作します
-
-## システム要件
-
-- Windows 10 / 11（64bit）
-- 管理者権限
-
-## 注意事項
-
-- SmartScreenの警告が出た場合は「詳細情報」→「実行」をクリック
-- Smart App Controlの警告が出た場合は[こちらの手順](https://toxov.net)を参照してください
-
-## お問い合わせ
-
-[toxov.net/contact](https://toxov.net/contact) または [toxovmail@gmail.com](mailto:toxovmail@gmail.com)
+All plans include a **7-day free trial**.
 
 ---
 
-## 更新履歴
+## FAQ
 
-### v1.3.0
-- agent.py 英語対応（Windows言語設定を自動検出）
-- お問い合わせフォームページを追加（/contact, /contact-en）
-- 利用規約ページを追加（日本語・英語）
-- Sentryによるエラー監視を導入
+**Q: Will it affect my other browsers?**
+A: Yes. Toxov modifies the system hosts file, which affects all browsers on your PC.
 
-### v1.2.0
-- Stripe決済・サブスクリプション機能を追加
-- アーリーバードプランを追加
-- ストリークシールド機能を追加
-- ポイント・シーズンランキング機能を追加
-- 英語LP・ダッシュボード対応（/en）
-- 特定商取引法・プライバシーポリシーページを追加
-- UI全面リデザイン
+**Q: What happens if I move Toxov.exe to a different folder?**
+A: The autostart task updates itself on every launch, so it will always point to the current location.
 
-### v1.1.0
-- アプリブロック機能を追加（Windowsファイアウォール経由）
-- ログ機能を追加（ブロック開始・終了・緊急解除の履歴）
-- ストリーク機能を追加（緊急解除なしの継続日数）
-- 二重起動防止を追加
+**Q: SmartScreen shows a warning — is it safe?**
+A: Yes. Toxov is unsigned (no code signing certificate yet), which triggers SmartScreen. Click "More info" → "Run anyway". You can verify the file on VirusTotal (see below).
 
-### v1.0.0
-- 初回リリース
+**Q: Does it work on Mac or mobile?**
+A: Windows only for now. See Roadmap below.
+
+**Q: How do I uninstall?**
+A: Delete `Toxov.exe` and remove the scheduled task named "Toxov" from Windows Task Scheduler. Your account and settings on toxov.net are separate.
+
+---
+
+## VirusTotal
+
+Some antivirus engines flag PyInstaller-packaged executables as suspicious. Toxov is clean — you can verify it yourself:
+
+**SHA256:** `e3ad8361b7785da79100a5d055fdfedccc4ac5c4a1f67541b9c4458536e31559`
+
+4 / 70 vendors flagged it (Bkav Pro, SecureAge, Yandex, CrowdStrike) — all known false positives for PyInstaller apps that modify system files. Major engines (Windows Defender, Avast, Bitdefender, etc.) show clean.
+
+---
+
+## Roadmap
+
+- [ ] Android app
+- [ ] Multi-language support (beyond Japanese/English)
+- [ ] Mac support
+
+---
+
+## Contact
+
+[toxov.net/contact-en](https://toxov.net/contact-en) or [toxovmail@gmail.com](mailto:toxovmail@gmail.com)
+
+---
+
+© 2026 Toxov
