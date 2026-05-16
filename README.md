@@ -18,9 +18,11 @@ Toxov works differently. It rewrites the **hosts file** and adds **Windows Firew
 
 ## Screenshots
 
-> 📸 *Dashboard screenshot coming soon*
+![Dashboard](https://github.com/user-attachments/assets/91c80223-5d00-4c8b-affd-5ca7f1bd13d5)
 
-> 🎬 *Demo video (YouTube blocked in real time) coming soon*
+## Demo
+
+https://github.com/user-attachments/assets/02e1e3fc-5db2-4a16-a447-3f8ea8cc9a5c
 
 ---
 

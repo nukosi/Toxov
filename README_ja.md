@@ -18,9 +18,11 @@ Toxovは**hostsファイルの書き換え**と**Windowsファイアウォール
 
 ## スクリーンショット
 
-> 📸 *ダッシュボードのスクリーンショット（近日追加）*
+![ダッシュボード](https://github.com/user-attachments/assets/91c80223-5d00-4c8b-affd-5ca7f1bd13d5)
 
-> 🎬 *デモ動画・YouTubeがブロックされる様子（近日追加）*
+## デモ動画
+
+https://github.com/user-attachments/assets/02e1e3fc-5db2-4a16-a447-3f8ea8cc9a5c
 
 ---
 
