@@ -492,13 +492,45 @@ def api_stats(token):
     })
 
 
+@app.route("/api/mobile/plans/<token>")
+@csrf.exempt
+def api_mobile_plans(token):
+    """利用可能な料金プランとStripe価格情報を返す。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    plan_defs = [
+        ("monthly",   STRIPE_PRICE_MONTHLY,   "月額プラン"),
+        ("yearly",    STRIPE_PRICE_YEARLY,     "年額プラン"),
+        ("earlybird", STRIPE_PRICE_EARLYBIRD,  "アーリーバード年額"),
+    ]
+    plans = []
+    for plan_id, price_id, label in plan_defs:
+        if not price_id or not STRIPE_SECRET_KEY:
+            continue
+        try:
+            price = stripe.Price.retrieve(price_id)
+            plans.append({
+                "id":       plan_id,
+                "label":    label,
+                "amount":   price.unit_amount,
+                "currency": price.currency,
+                "interval": getattr(price.recurring, "interval", None) if price.recurring else None,
+            })
+        except Exception:
+            pass
+    return jsonify({"plans": plans})
+
+
 @app.route("/api/mobile/checkout/<token>")
 @csrf.exempt
 def api_mobile_checkout(token):
     """モバイルアプリ向けStripe Checkoutセッション生成エンドポイント。ログイン不要でStripe決済URLを返す。"""
     if not check_agent_secret():
         return jsonify({"error": "forbidden"}), 403
-    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_MONTHLY:
+    if not STRIPE_SECRET_KEY:
         return jsonify({"error": "stripe_not_configured"}), 503
     user = get_user_by_token(token)
     if not user:
@@ -506,12 +538,22 @@ def api_mobile_checkout(token):
     full_user = get_user_by_id(user["id"])
     if full_user.get("plan") == "premium":
         return jsonify({"error": "already_premium"}), 400
+    # ?plan=monthly|yearly|earlybird で料金プランを選択する
+    plan_name = request.args.get("plan", "monthly")
+    price_map = {
+        "monthly":   STRIPE_PRICE_MONTHLY,
+        "yearly":    STRIPE_PRICE_YEARLY,
+        "earlybird": STRIPE_PRICE_EARLYBIRD,
+    }
+    price_id = price_map.get(plan_name) or STRIPE_PRICE_MONTHLY
+    if not price_id:
+        return jsonify({"error": "stripe_not_configured"}), 503
     success_url = (
         url_for("billing_mobile_success", _external=True)
         + f"?session_id={{CHECKOUT_SESSION_ID}}&token={token}"
     )
     params = {
-        "line_items": [{"price": STRIPE_PRICE_MONTHLY, "quantity": 1}],
+        "line_items": [{"price": price_id, "quantity": 1}],
         "mode": "subscription",
         "subscription_data": {"trial_period_days": 7},
         "client_reference_id": str(user["id"]),
