@@ -25,7 +25,7 @@ from database import (init_db, load_config, save_config,
                       set_emergency_unblock, add_event_log, get_event_logs, get_streak,
                       set_user_plan, has_emergency_history, get_success_rate,
                       apply_event_points, get_user_points, get_season_ranking, get_rank,
-                      get_user_by_connect_code, get_user_by_email, set_user_email,
+                      get_user_by_connect_code, get_user_by_email, get_user_by_username, set_user_email,
                       create_reset_token, verify_reset_token, consume_reset_token, update_password,
                       add_app_to_config, record_first_save, record_first_sync, get_analytics,
                       set_stripe_subscription, get_user_by_stripe_customer_id,
@@ -535,6 +535,34 @@ def api_mobile_login():
     full_user = get_user_by_id(user["id"])
     config_url = f"https://{request.host}/api/config/{full_user['api_token']}"
     return jsonify({"config_url": config_url})
+
+
+@app.route("/api/mobile/register", methods=["POST"])
+@csrf.exempt
+@limiter.limit("5 per minute")
+def api_mobile_register():
+    """モバイルから新規ユーザー登録してconfig_urlを返す。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    data     = request.get_json(silent=True) or {}
+    username = data.get("username", "").strip()
+    email    = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+    if not username or not email or not password:
+        return jsonify({"error": "missing_fields"}), 400
+    if len(username) < 3 or len(username) > 30:
+        return jsonify({"error": "invalid_username"}), 400
+    if len(password) < 8:
+        return jsonify({"error": "password_too_short"}), 400
+    if get_user_by_username(username):
+        return jsonify({"error": "username_taken"}), 409
+    if get_user_by_email(email):
+        return jsonify({"error": "email_taken"}), 409
+    create_user(username, password, email)
+    user      = verify_password(username, password)
+    full_user = get_user_by_id(user["id"])
+    config_url = f"https://{request.host}/api/config/{full_user['api_token']}"
+    return jsonify({"config_url": config_url}), 201
 
 
 @app.route("/api/mobile/plans/<token>")

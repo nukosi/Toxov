@@ -440,6 +440,12 @@ def get_user_by_email(email: str):
         return {"id": user.id, "username": user.username, "email": user.email} if user else None
 
 
+def get_user_by_username(username: str):
+    with Session(engine) as session:
+        user = session.query(UserModel).filter_by(username=username).first()
+        return {"id": user.id, "username": user.username} if user else None
+
+
 def set_user_email(user_id: int, email: str):
     # プロフィールページからメールアドレスを登録・更新する
     with Session(engine) as session:
