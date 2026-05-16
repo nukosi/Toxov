@@ -442,11 +442,13 @@ def api_config(token):
     record_first_sync(user["id"])
     config = load_config(user["id"])
     config["streak"] = get_streak(user["id"])
-    # ポイント・ランク情報をモバイルアプリ向けに追加する
+    # ポイント・ランク・プラン情報をモバイルアプリ向けに追加する
+    full_user = get_user_by_id(user["id"])
     pts = get_user_points(user["id"])
     config["season_points"]   = pts["season_points"]
     config["lifetime_points"] = pts["lifetime_points"]
     config["rank"]            = get_rank(pts["season_points"])
+    config["plan"]            = full_user.get("plan", "free")
     return jsonify(config)
 
 
