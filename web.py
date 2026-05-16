@@ -531,7 +531,9 @@ def api_mobile_login():
     user = verify_password(username, password)
     if not user:
         return jsonify({"error": "invalid_credentials"}), 401
-    config_url = f"https://{request.host}/api/config/{user['api_token']}"
+    # verify_passwordはapi_tokenを返さないのでfull_userから取得する
+    full_user = get_user_by_id(user["id"])
+    config_url = f"https://{request.host}/api/config/{full_user['api_token']}"
     return jsonify({"config_url": config_url})
 
 
