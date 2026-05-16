@@ -492,6 +492,81 @@ def api_stats(token):
     })
 
 
+@app.route("/api/mobile/checkout/<token>")
+@csrf.exempt
+def api_mobile_checkout(token):
+    """モバイルアプリ向けStripe Checkoutセッション生成エンドポイント。ログイン不要でStripe決済URLを返す。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_MONTHLY:
+        return jsonify({"error": "stripe_not_configured"}), 503
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    full_user = get_user_by_id(user["id"])
+    if full_user.get("plan") == "premium":
+        return jsonify({"error": "already_premium"}), 400
+    success_url = (
+        url_for("billing_mobile_success", _external=True)
+        + f"?session_id={{CHECKOUT_SESSION_ID}}&token={token}"
+    )
+    params = {
+        "line_items": [{"price": STRIPE_PRICE_MONTHLY, "quantity": 1}],
+        "mode": "subscription",
+        "subscription_data": {"trial_period_days": 7},
+        "client_reference_id": str(user["id"]),
+        "success_url": success_url,
+        "cancel_url": url_for("index", _external=True),
+        "locale": "ja",
+    }
+    if full_user.get("stripe_customer_id"):
+        params["customer"] = full_user["stripe_customer_id"]
+    elif full_user.get("email"):
+        params["customer_email"] = full_user["email"]
+    try:
+        session = stripe.checkout.Session.create(**params)
+    except stripe.error.InvalidRequestError as e:
+        if "similar object exists in test mode" in str(e):
+            params.pop("customer", None)
+            if full_user.get("email"):
+                params["customer_email"] = full_user["email"]
+            session = stripe.checkout.Session.create(**params)
+        else:
+            raise
+    return jsonify({"url": session.url})
+
+
+@app.route("/billing/mobile-success")
+@csrf.exempt
+def billing_mobile_success():
+    """Stripe決済完了後のモバイル向けコールバック。ログイン不要でプランを即時反映する。"""
+    session_id = request.args.get("session_id", "")
+    if session_id and STRIPE_SECRET_KEY:
+        try:
+            sess = stripe.checkout.Session.retrieve(session_id)
+            if getattr(sess, "payment_status", None) in ("paid", "no_payment_required"):
+                user_id = int(getattr(sess, "client_reference_id", None) or 0)
+                if user_id:
+                    set_stripe_subscription(
+                        user_id,
+                        customer_id=getattr(sess, "customer", None),
+                        subscription_id=getattr(sess, "subscription", None),
+                        plan="premium",
+                    )
+        except Exception:
+            pass
+    return (
+        "<html><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<style>body{background:#0f0f0f;color:#fff;font-family:sans-serif;"
+        "text-align:center;padding:60px 20px}h2{font-size:24px;margin-bottom:12px}"
+        "p{color:#888;font-size:15px}</style></head>"
+        "<body><h2>✅ Premiumへようこそ！</h2>"
+        "<p>アプリを開いてご利用ください。<br>ホーム画面を下に引っ張って更新すると反映されます。</p>"
+        "</body></html>"
+    )
+
+
 @app.route("/api/apps/add/<token>", methods=["POST"])
 @csrf.exempt
 def api_apps_add(token):
