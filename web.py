@@ -449,6 +449,7 @@ def api_config(token):
     config["lifetime_points"] = pts["lifetime_points"]
     config["rank"]            = get_rank(pts["season_points"])
     config["plan"]            = full_user.get("plan", "free")
+    config["role"]            = full_user.get("role", "user")
     return jsonify(config)
 
 
@@ -490,6 +491,26 @@ def api_stats(token):
         "rank_position": rank_pos,
         "logs":         logs,
     })
+
+
+@app.route("/api/admin/set-plan/<token>", methods=["POST"])
+@csrf.exempt
+def api_admin_set_plan(token):
+    """管理者専用：モバイルからプランをfree/premiumに切り替える（デバッグ用）。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    full_user = get_user_by_id(user["id"])
+    if full_user.get("role") != "admin":
+        return jsonify({"error": "admin only"}), 403
+    data = request.get_json(silent=True) or {}
+    plan = data.get("plan", "")
+    if plan not in ("free", "premium"):
+        return jsonify({"error": "invalid plan"}), 400
+    set_user_plan(user["id"], plan)
+    return jsonify({"ok": True, "plan": plan})
 
 
 @app.route("/api/mobile/plans/<token>")
