@@ -440,10 +440,54 @@ def api_config(token):
     if not user:
         return jsonify({"error": "invalid token"}), 401
     record_first_sync(user["id"])
-    # streakをconfig APIに含めることでモバイルアプリからも参照できるようにする
     config = load_config(user["id"])
     config["streak"] = get_streak(user["id"])
+    # ポイント・ランク情報をモバイルアプリ向けに追加する
+    pts = get_user_points(user["id"])
+    config["season_points"]   = pts["season_points"]
+    config["lifetime_points"] = pts["lifetime_points"]
+    config["rank"]            = get_rank(pts["season_points"])
     return jsonify(config)
+
+
+@app.route("/api/emergency/<token>", methods=["POST"])
+@csrf.exempt
+def api_emergency(token):
+    """モバイルアプリから緊急解除を発動するエンドポイント。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    full_user = get_user_by_id(user["id"])
+    # Premiumシールドがあれば消費してストリーク保護（既存ログAPIと同じロジック）
+    if full_user.get("plan") == "premium" and use_streak_shield(user["id"]):
+        add_event_log(user["id"], "shield_used")
+        set_emergency_unblock(user["id"], True)
+        return jsonify({"ok": True, "shield_used": True})
+    add_event_log(user["id"], "emergency_unblock")
+    apply_event_points(user["id"], "emergency_unblock")
+    set_emergency_unblock(user["id"], True)
+    return jsonify({"ok": True, "shield_used": False})
+
+
+@app.route("/api/stats/<token>")
+@csrf.exempt
+def api_stats(token):
+    """モバイルアプリ向け統計エンドポイント：ログ・ランキングを返す。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    ranking     = get_season_ranking(limit=20)
+    rank_pos    = get_user_rank_position(user["id"])
+    logs        = get_event_logs(user["id"], limit=30)
+    return jsonify({
+        "ranking":      ranking,
+        "rank_position": rank_pos,
+        "logs":         logs,
+    })
 
 
 @app.route("/api/apps/add/<token>", methods=["POST"])
