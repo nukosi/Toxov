@@ -513,6 +513,28 @@ def api_admin_set_plan(token):
     return jsonify({"ok": True, "plan": plan})
 
 
+@app.route("/api/mobile/login", methods=["POST"])
+@csrf.exempt
+@limiter.limit("10 per minute")
+def api_mobile_login():
+    """メールアドレス/ユーザー名とパスワードでモバイルログインし、config_urlを返す。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    data      = request.get_json(silent=True) or {}
+    login_id  = data.get("email", "").strip()
+    password  = data.get("password", "")
+    if not login_id or not password:
+        return jsonify({"error": "missing_fields"}), 400
+    # メールアドレスでユーザーを検索してユーザー名を取得する
+    user_by_email = get_user_by_email(login_id.lower())
+    username = user_by_email["username"] if user_by_email else login_id
+    user = verify_password(username, password)
+    if not user:
+        return jsonify({"error": "invalid_credentials"}), 401
+    config_url = f"https://{request.host}/api/config/{user['api_token']}"
+    return jsonify({"config_url": config_url})
+
+
 @app.route("/api/mobile/plans/<token>")
 @csrf.exempt
 def api_mobile_plans(token):
