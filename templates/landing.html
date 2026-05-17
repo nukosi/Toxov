@@ -227,6 +227,13 @@
     .feature-icon { font-size: 1.6rem; margin-bottom: 14px; }
     .feature-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
     .feature-card p { font-size: 0.85rem; color: #666; line-height: 1.6; }
+    .feature-badges { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
+    .badge-platform {
+      font-size: .68rem; font-weight: 600; letter-spacing: .4px;
+      padding: 3px 8px; border-radius: 20px;
+    }
+    .badge-win  { background: rgba(255,255,255,.07); color: #aaa; border: 1px solid rgba(255,255,255,.1); }
+    .badge-and  { background: rgba(100,220,130,.1);  color: #69DB7C; border: 1px solid rgba(100,220,130,.25); }
 
     /* 料金プラン */
     .pricing {
@@ -426,32 +433,73 @@
       <div class="feature-card">
         <div class="feature-icon">🌐</div>
         <h3>サイトブロック</h3>
-        <p>YouTube・SNS・ニュースサイトなど、集中を妨げるサイトを時間帯で自動遮断。hostsファイルを直接書き換えるため確実に動作します。</p>
+        <p>YouTube・SNS・ニュースサイトなど、集中を妨げるサイトを時間帯で自動遮断。ドメインを登録するだけで確実に動作します。</p>
+        <div class="feature-badges">
+          <span class="badge-platform badge-win">Windows</span>
+          <span class="badge-platform badge-and">Android</span>
+        </div>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🎮</div>
         <h3>アプリブロック</h3>
-        <p>ゲームや動画アプリなど、Windowsファイアウォールを使ってネット接続を遮断します。実行ファイルのパスを登録するだけ。</p>
+        <p>ゲームや動画アプリのネット接続を遮断します。登録したアプリはブロック時間中に使えなくなります。</p>
+        <div class="feature-badges">
+          <span class="badge-platform badge-win">Windows</span>
+          <span class="badge-platform badge-and">Android</span>
+        </div>
       </div>
       <div class="feature-card">
         <div class="feature-icon">⏰</div>
         <h3>スケジュール設定</h3>
-        <p>ブロックする時間帯を開始・終了で指定。PC起動時に自動で動作するので、毎日手動で操作する必要はありません。</p>
+        <p>ブロックする時間帯を開始・終了で指定。起動時に自動で動作するので、毎日手動で操作する必要はありません。</p>
+        <div class="feature-badges">
+          <span class="badge-platform badge-win">Windows</span>
+          <span class="badge-platform badge-and">Android</span>
+        </div>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🔥</div>
         <h3>ストリーク</h3>
-        <p>緊急解除を使わずに継続した日数を記録。数字が積み上がるほど、崩したくなくなります。</p>
+        <p>緊急解除を使わずに継続した日数を記録。数字が積み上がるほど、崩したくなくなります。節目には演出あり。</p>
+        <div class="feature-badges">
+          <span class="badge-platform badge-win">Windows</span>
+          <span class="badge-platform badge-and">Android</span>
+        </div>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🏆</div>
         <h3>ランキング</h3>
         <p>他のユーザーと継続日数・ポイントを競えます。自分が全体の何%にいるか可視化されます。<br><span style="font-size:.78rem;color:#F97316;">Premiumのみ</span></p>
+        <div class="feature-badges">
+          <span class="badge-platform badge-win">Windows</span>
+          <span class="badge-platform badge-and">Android</span>
+        </div>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🚨</div>
         <h3>緊急解除</h3>
-        <p>どうしても必要なときはWebサイトから一時解除できます。ただし、使うたびにストリークはリセットされます。</p>
+        <p>どうしても必要なときに一時解除できます。ただし、使うたびにストリークはリセットされます。</p>
+        <div class="feature-badges">
+          <span class="badge-platform badge-win">Windows</span>
+          <span class="badge-platform badge-and">Android</span>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔔</div>
+        <h3>通知</h3>
+        <p>ブロック開始・終了のタイミングで通知を受け取れます。ストリークの節目達成時も即時お知らせ。</p>
+        <div class="feature-badges">
+          <span class="badge-platform badge-win">Windows</span>
+          <span class="badge-platform badge-and">Android</span>
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📱</div>
+        <h3>ホーム画面ウィジェット</h3>
+        <p>ストリーク日数とブロック状態をホーム画面で常に確認できます。アプリを開かなくても今日の状況が一目でわかります。</p>
+        <div class="feature-badges">
+          <span class="badge-platform badge-and">Android</span>
+        </div>
       </div>
     </div>
   </section>
