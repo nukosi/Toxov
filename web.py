@@ -450,6 +450,8 @@ def api_config(token):
     config["rank"]            = get_rank(pts["season_points"])
     config["plan"]            = full_user.get("plan", "free")
     config["role"]            = full_user.get("role", "user")
+    phase = get_phase(config["streak"], has_emergency_history(user["id"]))
+    config["streak_comment"]  = get_comment(phase, "ja")
     return jsonify(config)
 
 
