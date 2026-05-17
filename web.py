@@ -31,11 +31,64 @@ from database import (init_db, load_config, save_config,
                       set_stripe_subscription, get_user_by_stripe_customer_id,
                       get_streak_shield, use_streak_shield,
                       get_premium_count, get_user_rank_position,
-                      set_otp, verify_otp)
+                      set_otp, verify_otp,
+                      create_todo_task, get_todo_tasks, delete_todo_task,
+                      toggle_todo_completion, get_todo_completions_today, get_todo_stats)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit
 from mailer import send_password_reset, send_otp_email, send_contact_email
 from translations import get_t
+
+# 管理者専用Todoテンプレート（変数: deadline_timeは別フィールド、vars内で定義）
+TODO_TEMPLATES = [
+    {"key": "squat",    "category": "運動", "label": "スクワット",
+     "pattern": "{deadline}までにスクワットを{count}回する",
+     "vars": [{"name": "count", "type": "number", "label": "回数", "default": 10}]},
+    {"key": "pushup",   "category": "運動", "label": "腕立て伏せ",
+     "pattern": "{deadline}までに腕立て伏せを{count}回する",
+     "vars": [{"name": "count", "type": "number", "label": "回数", "default": 10}]},
+    {"key": "running",  "category": "運動", "label": "ランニング",
+     "pattern": "{deadline}までにランニングを{duration}分する",
+     "vars": [{"name": "duration", "type": "number", "label": "分数", "default": 30}]},
+    {"key": "stretch",  "category": "運動", "label": "ストレッチ",
+     "pattern": "{deadline}までにストレッチを{duration}分する",
+     "vars": [{"name": "duration", "type": "number", "label": "分数", "default": 10}]},
+    {"key": "book",     "category": "学習", "label": "参考書を読む",
+     "pattern": "{deadline}までに「{title}」を{pages}ページ読む",
+     "vars": [
+         {"name": "title", "type": "text",   "label": "本の名前", "default": ""},
+         {"name": "pages", "type": "number", "label": "ページ数", "default": 10},
+     ]},
+    {"key": "vocab",    "category": "学習", "label": "単語を覚える",
+     "pattern": "{deadline}までに「{title}」の単語を{count}個覚える",
+     "vars": [
+         {"name": "title", "type": "text",   "label": "教材名", "default": ""},
+         {"name": "count", "type": "number", "label": "個数",   "default": 20},
+     ]},
+    {"key": "problems", "category": "学習", "label": "問題集を解く",
+     "pattern": "{deadline}までに「{title}」の問題を{count}問解く",
+     "vars": [
+         {"name": "title", "type": "text",   "label": "教材名", "default": ""},
+         {"name": "count", "type": "number", "label": "問数",   "default": 10},
+     ]},
+    {"key": "study",    "category": "学習", "label": "勉強する",
+     "pattern": "{deadline}までに勉強を{duration}分する",
+     "vars": [{"name": "duration", "type": "number", "label": "分数", "default": 60}]},
+]
+
+_TODO_TEMPLATE_MAP = {t["key"]: t for t in TODO_TEMPLATES}
+
+
+def render_todo_text(template_key: str, variables: dict, deadline_time: str) -> str:
+    """テンプレートキーと変数からタスクの表示テキストを生成する。"""
+    tmpl = _TODO_TEMPLATE_MAP.get(template_key)
+    if not tmpl:
+        return "不明なタスク"
+    text = tmpl["pattern"].replace("{deadline}", deadline_time)
+    for k, v in variables.items():
+        text = text.replace("{" + k + "}", str(v))
+    return text
+
 
 PRESET_SITES = [
     {
@@ -322,6 +375,10 @@ def index():
     user_rank     = get_user_rank_position(current_user.id)
     eb            = _earlybird_status()
     analytics = get_analytics() if current_user.role == "admin" else None
+    todo_tasks        = get_todo_tasks(current_user.id) if current_user.role == "admin" else []
+    completions_today = get_todo_completions_today(current_user.id) if current_user.role == "admin" else set()
+    todo_stats        = get_todo_stats(current_user.id) if current_user.role == "admin" else []
+    today_weekday     = datetime.datetime.now(JST).weekday()
     # エージェントが直近90秒以内にpollしていれば接続中とみなす（poll間隔30秒の3倍）
     user_data       = get_user_by_id(current_user.id)
     last_active_at  = user_data.get("last_active_at")
@@ -347,7 +404,11 @@ def index():
                            plan_expires_at=user_data.get("plan_expires_at"),
                            stripe_price_monthly=STRIPE_PRICE_MONTHLY,
                            stripe_price_yearly=STRIPE_PRICE_YEARLY,
-                           stripe_price_earlybird=STRIPE_PRICE_EARLYBIRD)
+                           stripe_price_earlybird=STRIPE_PRICE_EARLYBIRD,
+                           todo_tasks=todo_tasks, completions_today=completions_today,
+                           todo_stats=todo_stats, todo_templates=TODO_TEMPLATES,
+                           today_weekday=today_weekday, render_todo_text=render_todo_text,
+                           tab=request.args.get("tab"))
 
 
 @app.route("/save", methods=["POST"])
@@ -1035,6 +1096,54 @@ def api_subscription(token):
         "plan":           data.get("plan", "free"),
         "plan_expires_at": expires_at.isoformat() if expires_at else None,
     })
+
+
+# ─── Todo（管理者専用） ────────────────────────────────────────────────────────
+
+@app.route("/todo/create", methods=["POST"])
+@login_required
+def todo_create():
+    if current_user.role != "admin":
+        return redirect(url_for("index"))
+    template_key  = request.form.get("template_key", "")
+    deadline_time = request.form.get("deadline_time", "08:00")
+    weekdays_raw  = request.form.getlist("weekdays")
+    weekdays      = [int(d) for d in weekdays_raw if d.isdigit()]
+    tmpl = _TODO_TEMPLATE_MAP.get(template_key)
+    if not tmpl:
+        return redirect(url_for("index", tab="todo"))
+    variables = {}
+    for var in tmpl["vars"]:
+        val = request.form.get(f"var_{var['name']}", str(var["default"]))
+        if var["type"] == "number":
+            try:
+                variables[var["name"]] = int(val)
+            except ValueError:
+                variables[var["name"]] = var["default"]
+        else:
+            variables[var["name"]] = val
+    create_todo_task(current_user.id, template_key, variables, weekdays, deadline_time)
+    return redirect(url_for("index", tab="todo"))
+
+
+@app.route("/todo/complete/<int:task_id>", methods=["POST"])
+@login_required
+@csrf.exempt
+def todo_complete(task_id):
+    # セッション認証済み＋admin限定のAJAXエンドポイントのためCSRF免除
+    if current_user.role != "admin":
+        return jsonify({"error": "forbidden"}), 403
+    done = toggle_todo_completion(current_user.id, task_id)
+    return jsonify({"done": done})
+
+
+@app.route("/todo/delete/<int:task_id>", methods=["POST"])
+@login_required
+def todo_delete(task_id):
+    if current_user.role != "admin":
+        return redirect(url_for("index"))
+    delete_todo_task(current_user.id, task_id)
+    return redirect(url_for("index", tab="todo"))
 
 
 @app.route("/setup", methods=["GET", "POST"])

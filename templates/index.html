@@ -74,6 +74,15 @@
   {{ t.nav_logout }}
 </a>
 {% if role == "admin" %}
+<a href="#" class="sb-link" data-tab="todo" style="color:#e8a838;">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="1.5" y="2.5" width="4.5" height="4.5" rx=".5"/>
+    <line x1="8" y1="4.75" x2="14.5" y2="4.75"/>
+    <rect x="1.5" y="9" width="4.5" height="4.5" rx=".5"/>
+    <line x1="8" y1="11.25" x2="14.5" y2="11.25"/>
+  </svg>
+  Todo
+</a>
 <a href="#" class="sb-link" data-tab="admin" style="color:#5a6ad4;">
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
     <circle cx="8" cy="8" r="2.5"/>
@@ -109,6 +118,24 @@
 
 details > summary { list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
+
+/* Todo */
+.todo-wd {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px;
+  font-size: .72rem; font-weight: 700;
+  background: var(--bg-input); color: var(--dim); border: 1px solid var(--border);
+  user-select: none; cursor: default;
+}
+.todo-wd.active { background: rgba(249,115,22,.15); color: var(--accent); border-color: rgba(249,115,22,.3); }
+.todo-complete-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1.5px solid var(--border); background: none; cursor: pointer; color: var(--dim);
+  transition: border-color .12s, color .12s, background .12s; flex-shrink: 0;
+}
+.todo-complete-btn:hover { border-color: var(--success); color: var(--success); }
+.todo-complete-btn.done { background: rgba(61,214,140,.12); border-color: var(--success); color: var(--success); }
 
 {% endblock %}
 
@@ -735,12 +762,200 @@ details > summary::-webkit-details-marker { display: none; }
 </div>
 {% endif %}
 
+<!-- ═══════════════════════════════════════
+     Todo（admin のみ）
+═══════════════════════════════════════ -->
+{% if role == "admin" %}
+<div id="tab-todo" class="tab">
+
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <span style="font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Todo</span>
+    <button class="btn btn-accent" onclick="openTodoModal()" style="padding:6px 14px; font-size:.82rem;">＋ 追加</button>
+  </div>
+
+  <!-- 今日のタスク -->
+  <div style="margin-bottom:24px;">
+    <div class="card-label" style="margin-bottom:8px;">今日のタスク</div>
+    {% set ns = namespace(today_count=0) %}
+    {% for task in todo_tasks %}
+      {% if today_weekday in task.weekdays %}
+        {% set ns.today_count = ns.today_count + 1 %}
+        {% set done = task.id in completions_today %}
+        <div class="card" style="margin-bottom:6px; padding:12px 16px; display:flex; align-items:center; gap:12px;">
+          <button class="todo-complete-btn {{ 'done' if done else '' }}"
+                  onclick="todoComplete({{ task.id }}, this)"
+                  title="{{ '完了取り消し' if done else '完了にする' }}">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;">
+              <polyline points="3 8 6.5 11.5 13 4.5"/>
+            </svg>
+          </button>
+          <span style="flex:1; font-size:.9rem; color:{{ 'var(--dim)' if done else 'var(--text)' }}; {{ 'text-decoration:line-through;' if done else '' }}">
+            {{ render_todo_text(task.template_key, task.variables, task.deadline_time) }}
+          </span>
+        </div>
+      {% endif %}
+    {% endfor %}
+    {% if ns.today_count == 0 %}
+    <div style="font-size:.82rem; color:var(--dim); text-align:center; padding:16px 0;">今日の予定はありません</div>
+    {% endif %}
+  </div>
+
+  <!-- すべてのタスク -->
+  <div style="margin-bottom:24px;">
+    <div class="card-label" style="margin-bottom:8px;">すべてのタスク</div>
+    {% set wd_labels = ['月','火','水','木','金','土','日'] %}
+    {% if todo_tasks %}
+      {% for task in todo_tasks %}
+      <div class="card" style="margin-bottom:6px; padding:12px 16px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="flex:1; font-size:.88rem; color:var(--text);">
+            {{ render_todo_text(task.template_key, task.variables, task.deadline_time) }}
+          </span>
+          <form action="/todo/delete/{{ task.id }}" method="post" style="display:inline;" onsubmit="return confirm('このタスクを削除しますか？')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" style="background:none; border:none; cursor:pointer; color:var(--dim); padding:4px;" title="削除">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+                <polyline points="2 4 14 4"/>
+                <path d="M6 4V2h4v2"/>
+                <rect x="3" y="4" width="10" height="10" rx="1"/>
+              </svg>
+            </button>
+          </form>
+        </div>
+        <div style="display:flex; gap:4px; margin-top:8px; flex-wrap:wrap;">
+          {% for i in range(7) %}
+          <span class="todo-wd {{ 'active' if i in task.weekdays else '' }}">{{ wd_labels[i] }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <div style="font-size:.82rem; color:var(--dim); text-align:center; padding:16px 0;">タスクがありません</div>
+    {% endif %}
+  </div>
+
+  <!-- 30日の達成率 -->
+  <div>
+    <div class="card-label" style="margin-bottom:8px;">30日の達成率</div>
+    {% if todo_stats %}
+      {% for stat in todo_stats %}
+      <div class="card" style="margin-bottom:6px; padding:12px 16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:{% if stat.expected > 0 %}8{% else %}0{% endif %}px;">
+          <span style="flex:1; font-size:.82rem; color:var(--text);">
+            {{ render_todo_text(stat.template_key, stat.variables, stat.deadline_time) }}
+          </span>
+          <span style="font-size:.9rem; font-weight:700; margin-left:12px; flex-shrink:0; color:{% if stat.rate is none %}var(--dim){% elif stat.rate >= 80 %}var(--success){% elif stat.rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};">
+            {% if stat.rate is none %}—{% else %}{{ stat.rate }}%{% endif %}
+          </span>
+        </div>
+        {% if stat.expected > 0 %}
+        <div style="background:var(--bg-input); border-radius:4px; height:4px; overflow:hidden;">
+          <div style="width:{{ [stat.rate or 0, 100] | min }}%; height:100%; background:{% if (stat.rate or 0) >= 80 %}var(--success){% elif (stat.rate or 0) >= 50 %}var(--warning){% else %}var(--danger){% endif %}; transition:.3s;"></div>
+        </div>
+        <div style="font-size:.68rem; color:var(--dim); margin-top:4px;">{{ stat.completed }} / {{ stat.expected }} 日</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+    <div style="font-size:.82rem; color:var(--dim); text-align:center; padding:16px 0;">タスクを追加すると達成率が表示されます</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Todo作成モーダル -->
+<div id="todo-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; width:100%; max-width:420px; max-height:85vh; overflow-y:auto;">
+
+    <!-- Step 1: テンプレート選択 -->
+    <div id="todo-step-1">
+      <div style="padding:20px 20px 4px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+          <span style="font-size:1rem; font-weight:700; color:var(--text);">テンプレートを選択</span>
+          <button onclick="closeTodoModal()" style="background:none; border:none; color:var(--dim); cursor:pointer; font-size:1.1rem; line-height:1; padding:4px;">✕</button>
+        </div>
+      </div>
+      {% for cat in ['運動', '学習'] %}
+      <div style="padding:0 20px 16px;">
+        <div style="font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:8px;">{{ cat }}</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          {% for tmpl in todo_templates %}
+          {% if tmpl.category == cat %}
+          <button onclick="selectTemplate('{{ tmpl.key }}')"
+                  style="padding:12px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:.85rem; font-weight:500; cursor:pointer; text-align:center; font-family:inherit; transition:border-color .12s, color .12s;"
+                  onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+                  onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text)'">
+            {{ tmpl.label }}
+          </button>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Step 2: タスク設定 -->
+    <div id="todo-step-2" style="display:none;">
+      <form action="/todo/create" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="template_key" id="todo-tmpl-key">
+        <div style="padding:20px;">
+
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+            <button type="button" onclick="showTodoStep(1)"
+                    style="background:none; border:none; color:var(--dim); cursor:pointer; padding:2px 4px;">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; display:block;">
+                <polyline points="10 2 4 8 10 14"/>
+              </svg>
+            </button>
+            <span id="todo-tmpl-label" style="font-size:1rem; font-weight:700; color:var(--text);"></span>
+          </div>
+
+          <!-- プレビュー -->
+          <div style="background:var(--bg-input); border-radius:8px; padding:11px 14px; margin-bottom:16px; font-size:.88rem; color:var(--accent); min-height:36px;" id="todo-preview"></div>
+
+          <!-- 変数入力 -->
+          <div id="todo-vars" style="margin-bottom:16px;"></div>
+
+          <!-- 期限時刻 -->
+          <div style="margin-bottom:16px;">
+            <label style="font-size:.8rem; color:var(--muted); display:block; margin-bottom:4px;">期限時刻</label>
+            <input type="time" name="deadline_time" id="todo-deadline" value="08:00"
+                   oninput="updateTodoPreview()"
+                   style="padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--rs); color:var(--text); font-size:.88rem; font-family:inherit; width:140px;">
+          </div>
+
+          <!-- 曜日 -->
+          <div style="margin-bottom:20px;">
+            <div style="font-size:.8rem; color:var(--muted); margin-bottom:8px;">曜日</div>
+            <div style="display:flex; gap:6px;">
+              {% for wd in [['月',0],['火',1],['水',2],['木',3],['金',4],['土',5],['日',6]] %}
+              <label style="cursor:pointer;">
+                <input type="checkbox" name="weekdays" value="{{ wd[1] }}" checked
+                       onchange="this.nextElementSibling.classList.toggle('active', this.checked)"
+                       style="display:none;">
+                <span class="todo-wd active">{{ wd[0] }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-accent btn-full">追加する</button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
 <script>
   const BLOCKING = {{ 'true' if blocking else 'false' }};
   const CAN_ADD_DURING_BLOCK = {{ 'true' if limits.block_time_add else 'false' }};
+  const CSRF_TOKEN = '{{ csrf_token() }}';
 
   // ─── タブ切り替え ───
   function showTab(name) {
@@ -768,10 +983,10 @@ details > summary::-webkit-details-marker { display: none; }
 
   // エラー時はsettingsタブ（修正できるように）、保存成功時はhomeタブ（バナーが見えるように）
   const savedTab = sessionStorage.getItem('toxov-tab') || 'home';
-  const initialTab = {% if error == "session_expired" %}"home"{% elif error %}"settings"{% elif saved %}"home"{% else %}savedTab{% endif %};
+  const initialTab = {% if error == "session_expired" %}"home"{% elif error %}"settings"{% elif saved %}"home"{% elif tab %}"{{ tab }}"{% else %}savedTab{% endif %};
   showTab(initialTab);
   // URLからクエリパラメータを削除してリロード時に再表示されないようにする
-  if ({{ 'true' if saved or error or payment else 'false' }}) {
+  if ({{ 'true' if saved or error or payment or tab else 'false' }}) {
     history.replaceState({}, '', '/');
   }
 
@@ -802,5 +1017,77 @@ details > summary::-webkit-details-marker { display: none; }
     });
   }
   document.addEventListener('DOMContentLoaded', syncPresets);
+
+  // ─── Todo ───
+  {% if role == "admin" %}
+  const _TODO_TEMPLATES = {{ todo_templates | tojson }};
+  let _selectedTmpl = null;
+
+  function openTodoModal() {
+    _selectedTmpl = null;
+    showTodoStep(1);
+    document.getElementById('todo-modal').style.display = 'flex';
+  }
+  function closeTodoModal() {
+    document.getElementById('todo-modal').style.display = 'none';
+  }
+  function showTodoStep(n) {
+    document.getElementById('todo-step-1').style.display = n === 1 ? '' : 'none';
+    document.getElementById('todo-step-2').style.display = n === 2 ? '' : 'none';
+  }
+  function selectTemplate(key) {
+    _selectedTmpl = _TODO_TEMPLATES.find(t => t.key === key);
+    if (!_selectedTmpl) return;
+    document.getElementById('todo-tmpl-key').value = key;
+    document.getElementById('todo-tmpl-label').textContent = _selectedTmpl.label;
+    document.getElementById('todo-deadline').value = '08:00';
+    // 変数フィールドを生成
+    const varsEl = document.getElementById('todo-vars');
+    varsEl.innerHTML = '';
+    _selectedTmpl.vars.forEach(v => {
+      const div = document.createElement('div');
+      div.style.marginBottom = '12px';
+      const inputType = v.type === 'number' ? 'number' : 'text';
+      div.innerHTML = `
+        <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:4px;">${v.label}</label>
+        <input type="${inputType}" name="var_${v.name}" value="${v.default}"
+               ${v.type === 'number' ? 'min="1"' : ''}
+               oninput="updateTodoPreview()"
+               style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:.88rem;font-family:inherit;box-sizing:border-box;">`;
+      varsEl.appendChild(div);
+    });
+    updateTodoPreview();
+    showTodoStep(2);
+  }
+  function updateTodoPreview() {
+    if (!_selectedTmpl) return;
+    const deadline = document.getElementById('todo-deadline').value || '08:00';
+    let text = _selectedTmpl.pattern.replace('{deadline}', deadline);
+    _selectedTmpl.vars.forEach(v => {
+      const el = document.querySelector(`[name="var_${v.name}"]`);
+      text = text.replace(`{${v.name}}`, el ? (el.value || v.default) : v.default);
+    });
+    document.getElementById('todo-preview').textContent = text;
+  }
+  // モーダル外クリックで閉じる
+  document.getElementById('todo-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeTodoModal();
+  });
+
+  async function todoComplete(taskId, btn) {
+    const res = await fetch(`/todo/complete/${taskId}`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF_TOKEN }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    btn.classList.toggle('done', data.done);
+    const textEl = btn.nextElementSibling;
+    if (textEl) {
+      textEl.style.textDecoration = data.done ? 'line-through' : '';
+      textEl.style.color = data.done ? 'var(--dim)' : 'var(--text)';
+    }
+  }
+  {% endif %}
 </script>
 {% endblock %}
