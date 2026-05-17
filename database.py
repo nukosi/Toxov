@@ -111,6 +111,26 @@ class UserPoints(Base):
     lifetime_points = Column(Integer, nullable=False, default=0)
 
 
+class TodoTask(Base):
+    __tablename__ = "todo_tasks"
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    user_id       = Column(Integer, ForeignKey("users.id"), nullable=False)
+    template_key  = Column(String, nullable=False)
+    variables     = Column(String, nullable=False, default="{}")  # JSON
+    weekdays      = Column(String, nullable=False, default="[]")  # JSON [0-6] 0=月
+    deadline_time = Column(String, nullable=False, default="08:00")
+    created_at    = Column(DateTime, nullable=False)
+
+
+class TodoCompletion(Base):
+    __tablename__ = "todo_completions"
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    task_id      = Column(Integer, ForeignKey("todo_tasks.id"), nullable=False)
+    user_id      = Column(Integer, ForeignKey("users.id"), nullable=False)
+    date         = Column(String, nullable=False)  # YYYY-MM-DD
+    completed_at = Column(DateTime, nullable=False)
+
+
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
     id         = Column(Integer, primary_key=True, autoincrement=True)
@@ -240,6 +260,31 @@ def _migrate():
         if "otp_expires_at" not in user_columns_now:
             conn.execute(text("ALTER TABLE users ADD COLUMN otp_expires_at TIMESTAMP"))
         conn.commit()
+        # Todoテーブルを追加（存在しない場合のみ）
+        if "todo_tasks" not in inspector.get_table_names():
+            conn.execute(text("""
+                CREATE TABLE todo_tasks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    template_key TEXT NOT NULL,
+                    variables TEXT NOT NULL DEFAULT '{}',
+                    weekdays TEXT NOT NULL DEFAULT '[]',
+                    deadline_time TEXT NOT NULL DEFAULT '08:00',
+                    created_at TIMESTAMP NOT NULL
+                )
+            """))
+            conn.commit()
+        if "todo_completions" not in inspector.get_table_names():
+            conn.execute(text("""
+                CREATE TABLE todo_completions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    date TEXT NOT NULL,
+                    completed_at TIMESTAMP NOT NULL
+                )
+            """))
+            conn.commit()
 
 
 def create_user(username, password, email=None):
@@ -825,3 +870,116 @@ def save_config(user_id, block_start, block_end, sites, apps=None):
         for path in (apps or []):
             session.add(App(user_id=user_id, path=path))
         session.commit()
+
+
+# ── Todo ──────────────────────────────────────────────────────────────────────
+
+def create_todo_task(user_id: int, template_key: str, variables: dict,
+                     weekdays: list, deadline_time: str) -> int:
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    with Session(engine) as session:
+        task = TodoTask(
+            user_id=user_id,
+            template_key=template_key,
+            variables=json.dumps(variables, ensure_ascii=False),
+            weekdays=json.dumps(weekdays),
+            deadline_time=deadline_time,
+            created_at=now,
+        )
+        session.add(task)
+        session.commit()
+        return task.id
+
+
+def get_todo_tasks(user_id: int) -> list:
+    with Session(engine) as session:
+        tasks = session.query(TodoTask).filter_by(user_id=user_id).order_by(TodoTask.deadline_time).all()
+        return [
+            {
+                "id": t.id,
+                "template_key": t.template_key,
+                "variables": json.loads(t.variables or "{}"),
+                "weekdays": json.loads(t.weekdays or "[]"),
+                "deadline_time": t.deadline_time,
+                "created_at": t.created_at,
+            }
+            for t in tasks
+        ]
+
+
+def delete_todo_task(user_id: int, task_id: int) -> bool:
+    with Session(engine) as session:
+        task = session.query(TodoTask).filter_by(id=task_id, user_id=user_id).first()
+        if not task:
+            return False
+        session.query(TodoCompletion).filter_by(task_id=task_id).delete()
+        session.delete(task)
+        session.commit()
+        return True
+
+
+def toggle_todo_completion(user_id: int, task_id: int) -> bool:
+    """当日分の完了をトグルする。完了済みなら取り消し、未完了なら記録。完了後の状態をTrueで返す。"""
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    today = now.strftime("%Y-%m-%d")
+    with Session(engine) as session:
+        existing = session.query(TodoCompletion).filter_by(
+            task_id=task_id, user_id=user_id, date=today
+        ).first()
+        if existing:
+            session.delete(existing)
+            session.commit()
+            return False
+        session.add(TodoCompletion(
+            task_id=task_id, user_id=user_id, date=today, completed_at=now
+        ))
+        session.commit()
+        return True
+
+
+def get_todo_completions_today(user_id: int) -> set:
+    """今日完了済みのtask_idセットを返す。"""
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    today = datetime.datetime.now(JST).strftime("%Y-%m-%d")
+    with Session(engine) as session:
+        rows = session.query(TodoCompletion.task_id).filter_by(
+            user_id=user_id, date=today
+        ).all()
+        return {r[0] for r in rows}
+
+
+def get_todo_stats(user_id: int) -> list:
+    """タスクごとの過去30日の完了率を返す。"""
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    with Session(engine) as session:
+        tasks = session.query(TodoTask).filter_by(user_id=user_id).all()
+        result = []
+        for t in tasks:
+            weekdays = json.loads(t.weekdays or "[]")
+            created  = t.created_at
+            # タスク作成日から昨日までの対象曜日の日数を数える
+            expected = 0
+            check = max(created.date(), (now.date() - datetime.timedelta(days=30)))
+            while check < now.date():
+                if check.weekday() in weekdays:
+                    expected += 1
+                check += datetime.timedelta(days=1)
+            completed = session.query(TodoCompletion).filter(
+                TodoCompletion.task_id == t.id,
+                TodoCompletion.user_id == user_id,
+                TodoCompletion.date >= (now.date() - datetime.timedelta(days=30)).strftime("%Y-%m-%d"),
+                TodoCompletion.date < now.strftime("%Y-%m-%d"),
+            ).count()
+            result.append({
+                "task_id":      t.id,
+                "template_key": t.template_key,
+                "variables":    json.loads(t.variables or "{}"),
+                "deadline_time": t.deadline_time,
+                "expected":     expected,
+                "completed":    completed,
+                "rate":         round(completed / expected * 100) if expected > 0 else None,
+            })
+        return result
