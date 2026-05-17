@@ -80,6 +80,7 @@
 
     {% if not sent %}
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>お名前 <span class="opt">（任意）</span></label>
       <input type="text" name="name" maxlength="100" value="{{ name or '' }}">
 
