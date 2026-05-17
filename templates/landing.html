@@ -67,6 +67,86 @@
     .btn-ghost   { background: transparent; color: #aaa; border: 1px solid #333; }
     .btn-android { background: #1a2a1a; color: #4ade80; border: 1px solid #2a3f2a; }
 
+    /* セットアップ手順アコーディオン */
+    .setup-accordion {
+      max-width: 560px;
+      margin: 28px auto 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+    }
+    .setup-accordion details {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .setup-accordion details[open] { border-color: #3a3a3a; }
+    .setup-accordion summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      list-style: none;
+      user-select: none;
+    }
+    .setup-accordion summary::-webkit-details-marker { display: none; }
+    .setup-accordion summary::after {
+      content: "＋";
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 1rem;
+      transition: transform 0.2s;
+    }
+    .setup-accordion details[open] summary::after { content: "－"; }
+    .setup-accordion .setup-body {
+      padding: 0 18px 18px;
+      border-top: 1px solid var(--border);
+    }
+    .setup-steps {
+      list-style: none;
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .setup-steps li {
+      display: flex;
+      gap: 12px;
+      font-size: 0.83rem;
+      color: #bbb;
+      line-height: 1.5;
+    }
+    .setup-steps li .step-num {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(249,115,22,0.3);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .setup-warn {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: rgba(255,200,0,0.06);
+      border: 1px solid rgba(255,200,0,0.15);
+      border-radius: 7px;
+      font-size: 0.78rem;
+      color: #999;
+      line-height: 1.5;
+    }
+
     /* アーリーバードバナー */
     .earlybird-banner {
       background: linear-gradient(90deg, rgba(249,115,22,0.15), rgba(249,115,22,0.08));
@@ -301,16 +381,43 @@
       <a href="https://github.com/nukosi/Toxov.android.1/releases/download/v1.0.0/Toxov-v1.0.0.apk" class="btn btn-android">📱 Android APK</a>
       <a href="/register" class="btn btn-ghost">アカウントを作成</a>
     </div>
-    <p class="hero-note">Windows専用 · 管理者権限が必要</p>
-    <p class="hero-note" style="margin-top:6px; color:#555;">Android: APKダウンロード後、「提供元不明のアプリを許可」からインストール</p>
-    <p class="hero-note" style="margin-top:8px; color:#555;">
-      ⚠️ Smart App Control が有効な場合、事前にオフにしてからダウンロードしてください。<br>
-      設定方法：Windowsセキュリティ → アプリとブラウザーの制御 → Smart App Control → オフ
-    </p>
-    <p class="hero-note" style="margin-top:8px; color:#555;">
-      ⚠️ ウイルスバスター等のアンチウイルスソフトをお使いの場合、誤検知で削除されることがあります。<br>
-      ダウンロード前にアンチウイルスを一時停止するか、ダウンロードフォルダを除外設定に追加してください。
-    </p>
+    <div class="setup-accordion">
+
+      <!-- Windows版 -->
+      <details>
+        <summary>🖥️ Windows版のセットアップ手順</summary>
+        <div class="setup-body">
+          <ol class="setup-steps">
+            <li><span class="step-num">1</span><span>上の「Toxov.exe をダウンロード」をクリック</span></li>
+            <li><span class="step-num">2</span><span>ダウンロードしたファイルをダブルクリック → 管理者として実行</span></li>
+            <li><span class="step-num">3</span><span>「アカウントを作成」からアカウント登録（無料）</span></li>
+            <li><span class="step-num">4</span><span>ログイン後、Toxov.exe に表示される設定画面でブロック時間帯を設定して完了</span></li>
+          </ol>
+          <div class="setup-warn">
+            ⚠️ <strong>Smart App Control が有効な場合</strong>、インストール前にオフにしてください。<br>
+            Windowsセキュリティ → アプリとブラウザーの制御 → Smart App Control → オフ<br><br>
+            ⚠️ <strong>ウイルスバスター等のアンチウイルス</strong>をお使いの場合、誤検知で削除されることがあります。一時停止またはダウンロードフォルダを除外設定に追加してください。
+          </div>
+        </div>
+      </details>
+
+      <!-- Android版 -->
+      <details>
+        <summary>📱 Android版のセットアップ手順</summary>
+        <div class="setup-body">
+          <ol class="setup-steps">
+            <li><span class="step-num">1</span><span>上の「Android APK」をタップしてダウンロード</span></li>
+            <li><span class="step-num">2</span><span>ダウンロードしたファイルをタップ → 「提供元不明のアプリを許可」→ インストール</span></li>
+            <li><span class="step-num">3</span><span>アプリを開いて「新規登録」からアカウント作成、またはすでにアカウントがある場合はログイン</span></li>
+            <li><span class="step-num">4</span><span>VPN・UsageStats・オーバーレイ権限を許可してブロック設定を行い完了</span></li>
+          </ol>
+          <div class="setup-warn">
+            ⚠️ Android 8以降対応 · Google Play非掲載のため「提供元不明」の許可が必要です（1回のみ）
+          </div>
+        </div>
+      </details>
+
+    </div>
   </section>
 
   <section class="features">
