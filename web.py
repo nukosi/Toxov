@@ -35,7 +35,7 @@ from database import (init_db, load_config, save_config,
                       create_todo_task, get_todo_tasks, delete_todo_task,
                       toggle_todo_completion, get_todo_completions_today, get_todo_stats)
 from comments import get_comment, get_phase
-from plans import get_limits, within_site_limit, within_app_limit
+from plans import get_limits, within_site_limit, within_app_limit, count_unique_domains
 from mailer import send_password_reset, send_otp_email, send_contact_email
 from translations import get_t
 
@@ -434,8 +434,8 @@ def save():
         if not set(config["apps"]).issubset(set(apps)):
             return redirect(url_for("index", error="blocking"))
 
-    # プランの上限チェック
-    if not within_site_limit(current_user.plan, len(sites)):
+    # プランの上限チェック（www.youtube.com と youtube.com は同一サービスとして1件扱い）
+    if not within_site_limit(current_user.plan, count_unique_domains(sites)):
         return redirect(url_for("index", error="site_limit"))
     if not within_app_limit(current_user.plan, len(apps)):
         return redirect(url_for("index", error="app_limit"))
@@ -1111,8 +1111,8 @@ def api_sites_save(token):
     if is_blocking_time(config):
         if not set(config["sites"]).issubset(set(sites)):
             return jsonify({"error": "blocking"}), 403
-    # プランの上限チェック
-    if not within_site_limit(full_user.get("plan", "free"), len(sites)):
+    # プランの上限チェック（www.youtube.com と youtube.com は同一サービスとして1件扱い）
+    if not within_site_limit(full_user.get("plan", "free"), count_unique_domains(sites)):
         return jsonify({"error": "site_limit"}), 403
     # block_start/block_end/appsはそのまま保持し、sitesのみ更新する
     save_config(user["id"], config["block_start"], config["block_end"], sites, config["apps"])
