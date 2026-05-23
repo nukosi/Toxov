@@ -1098,6 +1098,42 @@ def api_subscription(token):
     })
 
 
+@app.route("/api/sites/save/<token>", methods=["POST"])
+@csrf.exempt
+def api_sites_save(token):
+    """モバイルアプリからサイトリストを更新するエンドポイント。ブロック時間中の制限はPC版 /save と同じルールを適用する。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    data  = request.get_json(silent=True) or {}
+    sites = data.get("sites", [])
+    if not isinstance(sites, list):
+        return jsonify({"error": "invalid sites"}), 400
+    # 空白・空文字を除去してサニタイズ
+    sites = [str(s).strip() for s in sites if str(s).strip()]
+    full_user = get_user_by_id(user["id"])
+    config    = load_config(user["id"])
+    # ブロック時間中はプランに応じてサイトの変更を制限する
+    if is_blocking_time(config):
+        limits = get_limits(full_user.get("plan", "free"))
+        if limits["block_time_add"]:
+            # Premium: 既存サイトの削除は不可（追加のみ許可）
+            if not set(config["sites"]).issubset(set(sites)):
+                return jsonify({"error": "blocking"}), 403
+        else:
+            # 無料: 追加も削除も不可
+            if set(sites) != set(config["sites"]):
+                return jsonify({"error": "blocking_free"}), 403
+    # プランの上限チェック
+    if not within_site_limit(full_user.get("plan", "free"), len(sites)):
+        return jsonify({"error": "site_limit"}), 403
+    # block_start/block_end/appsはそのまま保持し、sitesのみ更新する
+    save_config(user["id"], config["block_start"], config["block_end"], sites, config["apps"])
+    return jsonify({"ok": True})
+
+
 # ─── Todo（管理者専用） ────────────────────────────────────────────────────────
 
 @app.route("/todo/create", methods=["POST"])
