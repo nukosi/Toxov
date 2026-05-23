@@ -21,8 +21,10 @@ SERVER_BASE = "https://web-production-ed8c9.up.railway.app"
 # 配布前に必ずRailwayで AGENT_SECRET を設定し、この値を合わせてビルドし直す
 AGENT_SECRET = "toxov-prod-abc123xyz"
 
-CONFIG_DIR  = os.path.join(os.environ["APPDATA"], "Toxov")
-CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+CONFIG_DIR   = os.path.join(os.environ["APPDATA"], "Toxov")
+CONFIG_FILE  = os.path.join(CONFIG_DIR, "config.json")
+# サーバー設定のローカルキャッシュ。起動直後の即時ブロック適用に使う
+CACHE_FILE   = os.path.join(CONFIG_DIR, "last_config.json")
 HOSTS_FILE  = r"C:\Windows\System32\drivers\etc\hosts"
 # hostsファイルに追記する行の末尾に付けるタグ。unblock時にこのタグで自分が書いた行だけ削除する
 BLOCK_TAG     = "# Toxov"
@@ -177,11 +179,13 @@ def register_autostart():
     ps = f"""
 Unregister-ScheduledTask -TaskName 'nukosisnsblocker' -Confirm:$false -ErrorAction SilentlyContinue
 Unregister-ScheduledTask -TaskName 'CutNet' -Confirm:$false -ErrorAction SilentlyContinue
-$action   = New-ScheduledTaskAction -Execute '{exe}'
-$trigger  = New-ScheduledTaskTrigger -AtLogOn
-$principal= New-ScheduledTaskPrincipal -UserId '{os.environ["USERNAME"]}' -RunLevel Highest -LogonType Interactive
-$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0
-Register-ScheduledTask -TaskName 'Toxov' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force
+$action    = New-ScheduledTaskAction -Execute '{exe}'
+$trigLogon = New-ScheduledTaskTrigger -AtLogOn -User '{os.environ["USERNAME"]}'
+$trigBoot  = New-ScheduledTaskTrigger -AtStartup
+$trigBoot.Delay = 'PT30S'
+$principal = New-ScheduledTaskPrincipal -UserId '{os.environ["USERNAME"]}' -RunLevel Highest -LogonType Interactive
+$settings  = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0 -MultipleInstances IgnoreNew
+Register-ScheduledTask -TaskName 'Toxov' -Action $action -Trigger @($trigLogon,$trigBoot) -Principal $principal -Settings $settings -Force
 """
     subprocess.run(["powershell", "-Command", ps], capture_output=True)
 
@@ -189,6 +193,23 @@ Register-ScheduledTask -TaskName 'Toxov' -Action $action -Trigger $trigger -Prin
 def load_local_config():
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def save_cached_config(config: dict):
+    """次回起動時の即時適用用にサーバー設定をローカルキャッシュする。"""
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(config, f)
+    except Exception:
+        pass
+
+
+def load_cached_config() -> dict | None:
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 
 def set_doh_policy(disable: bool):
@@ -485,15 +506,30 @@ def config_stream(url, log):
     """
     設定取得インターフェース。
     将来このジェネレータをWebSocket版に丸ごと置き換える。
+    サーバー不達が続く場合はエクスポネンシャルバックオフで再試行間隔を伸ばす。
     """
+    consecutive_failures = 0
+    MAX_BACKOFF = 600  # 最大10分
+
     while True:
         try:
             response = requests.get(url, headers=_API_HEADERS, timeout=10)
             response.raise_for_status()
-            yield response.json()
+            if consecutive_failures > 0:
+                log(f"reconnected after {consecutive_failures} failure(s)")
+            consecutive_failures = 0
+            config = response.json()
+            save_cached_config(config)  # 次回起動用にキャッシュ更新
+            yield config
+            time.sleep(POLL_INTERVAL)
         except Exception as e:
-            log(f"error: {e}")
-        time.sleep(POLL_INTERVAL)
+            consecutive_failures += 1
+            # 最初の失敗と5の倍数回目だけログに残してスパムを防ぐ
+            if consecutive_failures == 1 or consecutive_failures % 5 == 0:
+                log(f"error (#{consecutive_failures}): {e}")
+            # 30s → 60s → 120s → 240s → 最大600s でバックオフ
+            backoff = min(POLL_INTERVAL * (2 ** min(consecutive_failures - 1, 4)), MAX_BACKOFF)
+            time.sleep(backoff)
 
 
 def apply_config(config, current_state, last_version, log, lang="ja"):
@@ -576,9 +612,11 @@ def main():
     masked_url = cloud_url[:-8] + "..." + cloud_url[-4:] if len(cloud_url) > 12 else "***"
     log(f"start URL={masked_url} exe={sys.executable}")
 
-    # exeの場所が変わっても正しく自動起動するよう毎回タスクを更新する
-    register_autostart()
-    log("autostart re-registered")
+    # register_autostartはブロック開始を遅らせないようバックグラウンドで実行する
+    def _reregister():
+        register_autostart()
+        log("autostart re-registered")
+    threading.Thread(target=_reregister, daemon=True).start()
 
     # config URLからlog・アプリ追加のURLを導出する（トークンは共通）
     log_url = cloud_url.replace("/api/config/", "/api/log/")
@@ -587,9 +625,20 @@ def main():
     # トレイアイコンをメインスレッドで動かすため、ポーリングループを別スレッドに移す
     tray = setup_tray(add_url, log, lang)
 
+    # 前回取得した設定をキャッシュから即時適用（ネットワーク待ちゼロ）
+    cached = load_cached_config()
+    if cached:
+        log("applying cached config on startup")
+        init_state, init_version, _ = apply_config(cached, None, None, log, lang)
+        _tray_state["blocking"] = init_state
+        tray.icon = make_icon(init_state is True)
+        log(f"cache applied: {'blocking' if init_state else 'unblocked'}")
+    else:
+        init_state, init_version = None, None
+
     def polling_loop():
-        current_state  = None
-        last_version   = None
+        current_state  = init_state
+        last_version   = init_version
         prev_emergency = False  # 前回pollで緊急解除中だったか
         for config in config_stream(cloud_url, log):
             emergency = config.get("emergency_unblock", False)
