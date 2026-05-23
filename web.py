@@ -428,19 +428,11 @@ def save():
         # ブロック時間中はスケジュール変更不可（全プラン共通）
         if block_start != config["block_start"] or block_end != config["block_end"]:
             return redirect(url_for("index", error="blocking"))
-        limits = get_limits(current_user.plan)
-        if limits['block_time_add']:
-            # Premium: 追加のみ許可（既存サイト・アプリの削除は不可）
-            if not set(config["sites"]).issubset(set(sites)):
-                return redirect(url_for("index", error="blocking"))
-            if not set(config["apps"]).issubset(set(apps)):
-                return redirect(url_for("index", error="blocking"))
-        else:
-            # 無料: 追加も削除も不可（完全ロック）
-            if set(sites) != set(config["sites"]):
-                return redirect(url_for("index", error="blocking_free"))
-            if set(apps) != set(config["apps"]):
-                return redirect(url_for("index", error="blocking_free"))
+        # 全プラン共通：追加のみ許可、既存サイト・アプリの削除は不可
+        if not set(config["sites"]).issubset(set(sites)):
+            return redirect(url_for("index", error="blocking"))
+        if not set(config["apps"]).issubset(set(apps)):
+            return redirect(url_for("index", error="blocking"))
 
     # プランの上限チェック
     if not within_site_limit(current_user.plan, len(sites)):
@@ -1115,17 +1107,10 @@ def api_sites_save(token):
     sites = [str(s).strip() for s in sites if str(s).strip()]
     full_user = get_user_by_id(user["id"])
     config    = load_config(user["id"])
-    # ブロック時間中はプランに応じてサイトの変更を制限する
+    # ブロック時間中は全プラン共通で追加のみ許可、削除は不可
     if is_blocking_time(config):
-        limits = get_limits(full_user.get("plan", "free"))
-        if limits["block_time_add"]:
-            # Premium: 既存サイトの削除は不可（追加のみ許可）
-            if not set(config["sites"]).issubset(set(sites)):
-                return jsonify({"error": "blocking"}), 403
-        else:
-            # 無料: 追加も削除も不可
-            if set(sites) != set(config["sites"]):
-                return jsonify({"error": "blocking_free"}), 403
+        if not set(config["sites"]).issubset(set(sites)):
+            return jsonify({"error": "blocking"}), 403
     # プランの上限チェック
     if not within_site_limit(full_user.get("plan", "free"), len(sites)):
         return jsonify({"error": "site_limit"}), 403

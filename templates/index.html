@@ -359,11 +359,7 @@ details > summary::-webkit-details-marker { display: none; }
       <textarea id="sites-ta" name="sites" style="height:72px; text-align:left;">{{ config.sites|join('\n') }}</textarea>
       <p class="hint" style="color:var(--muted);">{{ t.site_hint }}</p>
       {% if blocking %}
-        {% if limits.block_time_add %}
-          <p class="lock-note">{{ t.lock_sites_delete }}</p>
-        {% else %}
-          <p class="lock-note">{{ t.lock_sites_all }}</p>
-        {% endif %}
+        <p class="lock-note">{{ t.lock_sites_delete }}</p>
       {% endif %}
     </div>
 
@@ -378,11 +374,7 @@ details > summary::-webkit-details-marker { display: none; }
       <textarea name="apps" style="height:100px;">{{ config.apps|join('\n') }}</textarea>
       <p class="hint" style="color:var(--muted);">{{ t.app_hint }}</p>
       {% if blocking %}
-        {% if limits.block_time_add %}
-          <p class="lock-note">{{ t.lock_sites_delete }}</p>
-        {% else %}
-          <p class="lock-note">{{ t.lock_sites_all }}</p>
-        {% endif %}
+        <p class="lock-note">{{ t.lock_sites_delete }}</p>
       {% endif %}
     </div>
 
@@ -954,7 +946,6 @@ details > summary::-webkit-details-marker { display: none; }
 {% block scripts %}
 <script>
   const BLOCKING = {{ 'true' if blocking else 'false' }};
-  const CAN_ADD_DURING_BLOCK = {{ 'true' if limits.block_time_add else 'false' }};
   const CSRF_TOKEN = '{{ csrf_token() }}';
 
   // ─── タブ切り替え ───
@@ -1005,7 +996,7 @@ details > summary::-webkit-details-marker { display: none; }
       if (BLOCKING) return;  // 削除: ブロック中は全プランで不可
       setTA(cur.filter(d => !domains.includes(d)));
     } else {
-      if (BLOCKING && !CAN_ADD_DURING_BLOCK) return;  // 追加: 無料はブロック中不可
+      // 追加は全プランでブロック時間中も許可
       setTA([...cur, ...domains.filter(d => !cur.includes(d))]);
     }
     syncPresets();
