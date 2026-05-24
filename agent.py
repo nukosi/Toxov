@@ -266,11 +266,13 @@ def block(sites, apps):
         content = f.read()
     with open(HOSTS_FILE, "a") as f:
         for site in sites:
-            # サブドメインなしのドメインは www. 版も追加する
-            # 例: tiktok.com → tiktok.com と www.tiktok.com の両方をブロック
+            # 保存時に normalize_domain でapexドメインに正規化済みのため、
+            # www. / m. / mobile. バリエーションをここで展開してすべてブロックする
             variants = [site]
-            if not site.startswith("www.") and site.count(".") == 1:
+            if not site.startswith("www."):
                 variants.append(f"www.{site}")
+            if not site.startswith("m."):
+                variants.append(f"m.{site}")
             for domain in variants:
                 entry = f"0.0.0.0 {domain} {BLOCK_TAG}\n"
                 if entry not in content:

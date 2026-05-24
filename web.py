@@ -35,7 +35,7 @@ from database import (init_db, load_config, save_config,
                       create_todo_task, get_todo_tasks, delete_todo_task,
                       toggle_todo_completion, get_todo_completions_today, get_todo_stats)
 from comments import get_comment, get_phase
-from plans import get_limits, within_site_limit, within_app_limit, count_unique_domains
+from plans import get_limits, within_site_limit, within_app_limit, count_unique_domains, normalize_domain
 from mailer import send_password_reset, send_otp_email, send_contact_email
 from translations import get_t
 
@@ -418,7 +418,9 @@ def save():
     block_end   = request.form["block_end"]
     sites_raw   = request.form.get("sites", "")
     apps_raw    = request.form.get("apps", "")
-    sites       = [s.strip() for s in sites_raw.splitlines() if s.strip()]
+    # www./m./mobile. プレフィックスを除去してサービス単位のapexドメインに正規化する
+    # 入力: "www.tiktok.com" → 保存: "tiktok.com"
+    sites       = [normalize_domain(s.strip()) for s in sites_raw.splitlines() if s.strip()]
     apps        = [a.strip() for a in apps_raw.splitlines() if a.strip()]
 
     config   = load_config(current_user.id)
@@ -1104,7 +1106,7 @@ def api_sites_save(token):
     if not isinstance(sites, list):
         return jsonify({"error": "invalid sites"}), 400
     # 空白・空文字を除去してサニタイズ
-    sites = [str(s).strip() for s in sites if str(s).strip()]
+    sites = [normalize_domain(str(s).strip()) for s in sites if str(s).strip()]
     full_user = get_user_by_id(user["id"])
     config    = load_config(user["id"])
     # ブロック時間中は全プラン共通で追加のみ許可、削除は不可
