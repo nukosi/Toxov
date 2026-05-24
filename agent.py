@@ -266,9 +266,15 @@ def block(sites, apps):
         content = f.read()
     with open(HOSTS_FILE, "a") as f:
         for site in sites:
-            entry = f"0.0.0.0 {site} {BLOCK_TAG}\n"
-            if entry not in content:
-                f.write(entry)
+            # サブドメインなしのドメインは www. 版も追加する
+            # 例: tiktok.com → tiktok.com と www.tiktok.com の両方をブロック
+            variants = [site]
+            if not site.startswith("www.") and site.count(".") == 1:
+                variants.append(f"www.{site}")
+            for domain in variants:
+                entry = f"0.0.0.0 {domain} {BLOCK_TAG}\n"
+                if entry not in content:
+                    f.write(entry)
     # ブラウザの内部DNSキャッシュはタブを閉じるまで残るが、OSキャッシュはここでクリアする
     subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
 
@@ -290,27 +296,28 @@ def block(sites, apps):
 
 
 def kill_edge_connections(log=None):
-    # EdgeのNetwork Serviceプロセスだけをwmicで特定して終了する
-    # NetworkServiceはEdgeに自動再起動され、再起動後は空のDNSキャッシュで動作するためhostsが即時反映される
-    try:
-        result = subprocess.run(
-            ["wmic", "process", "where",
-             "name='msedge.exe' and commandline like '%network.mojom.NetworkService%'",
-             "get", "ProcessId", "/format:value"],
-            capture_output=True, text=True, timeout=15,
-        )
-        killed = 0
-        for line in result.stdout.strip().splitlines():
-            if "=" in line:
-                pid = line.split("=")[-1].strip()
-                if pid.isdigit():
-                    subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
-                    killed += 1
-        if log:
-            log(f"[kill_edge] NetworkService {killed} terminated")
-    except Exception as e:
-        if log:
-            log(f"[kill_edge] error: {e}")
+    # Edge・ChromeのNetworkServiceプロセスを終了してDNSキャッシュをクリアする
+    # NetworkServiceは各ブラウザに自動再起動され、再起動後は空のDNSキャッシュでhostsが即時反映される
+    for exe in ("msedge.exe", "chrome.exe"):
+        try:
+            result = subprocess.run(
+                ["wmic", "process", "where",
+                 f"name='{exe}' and commandline like '%network.mojom.NetworkService%'",
+                 "get", "ProcessId", "/format:value"],
+                capture_output=True, text=True, timeout=15,
+            )
+            killed = 0
+            for line in result.stdout.strip().splitlines():
+                if "=" in line:
+                    pid = line.split("=")[-1].strip()
+                    if pid.isdigit():
+                        subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
+                        killed += 1
+            if log and killed > 0:
+                log(f"[kill_browser] {exe} NetworkService {killed} terminated")
+        except Exception as e:
+            if log:
+                log(f"[kill_browser] {exe} error: {e}")
 
 
 def unblock(log=None):
