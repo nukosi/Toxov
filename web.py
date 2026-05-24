@@ -110,7 +110,7 @@ PRESET_SITES = [
             {"name": "TikTok",     "domains": ["tiktok.com"]},
             {"name": "Reddit",     "domains": ["reddit.com"]},
             {"name": "Facebook",   "domains": ["facebook.com"]},
-            {"name": "Discord",    "domains": ["discord.com"]},
+            {"name": "Discord",    "domains": ["discord.com", "discordapp.com", "discord.gg"]},
         ],
     },
     {
