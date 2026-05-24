@@ -688,8 +688,10 @@ def main():
                 pass
             for event in events:
                 if event == "block_start":
+                    # EdgeのNetworkServiceを再起動してDNSキャッシュをクリアする
+                    # DoHポリシーの即時反映とhostsファイルの即時適用のために毎回実行する
+                    kill_edge_connections(log)
                     if prev_emergency:
-                        kill_edge_connections(log)
                         notify(s["notify_reblock"])
                     else:
                         notify(s["notify_block_start"].format(comment=get_comment("block_start", lang)))
