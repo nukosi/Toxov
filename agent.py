@@ -24,7 +24,10 @@ AGENT_SECRET = "toxov-prod-abc123xyz"
 CONFIG_DIR   = os.path.join(os.environ["APPDATA"], "Toxov")
 CONFIG_FILE  = os.path.join(CONFIG_DIR, "config.json")
 # サーバー設定のローカルキャッシュ。起動直後の即時ブロック適用に使う
-CACHE_FILE   = os.path.join(CONFIG_DIR, "last_config.json")
+CACHE_FILE      = os.path.join(CONFIG_DIR, "last_config.json")
+# ファイアウォールルールが存在するかを記録するフラグファイル
+# これがない場合は netsh delete をスキップして起動時の遅延（~27秒）を防ぐ
+FIREWALL_FLAG   = os.path.join(CONFIG_DIR, "firewall_active.flag")
 HOSTS_FILE  = r"C:\Windows\System32\drivers\etc\hosts"
 # hostsファイルに追記する行の末尾に付けるタグ。unblock時にこのタグで自分が書いた行だけ削除する
 BLOCK_TAG     = "# Toxov"
@@ -212,6 +215,17 @@ def load_cached_config() -> dict | None:
         return None
 
 
+def _set_firewall_flag(active: bool):
+    """ファイアウォールルールの有無をフラグファイルに記録する。"""
+    try:
+        if active:
+            open(FIREWALL_FLAG, 'w').close()
+        elif os.path.exists(FIREWALL_FLAG):
+            os.remove(FIREWALL_FLAG)
+    except Exception:
+        pass
+
+
 def set_doh_policy(disable: bool):
     # Edge・ChromeのDNS over HTTPSをレジストリのグループポリシーで制御する
     # disable=True でDoHを強制オフ（hostsファイルが有効になる）
@@ -259,17 +273,20 @@ def block(sites, apps):
     subprocess.run(["ipconfig", "/flushdns"], capture_output=True)
 
     # --- アプリ：Windowsファイアウォールで遮断 ---
-    # 既存のToxovルールを一旦全削除してから再登録する（削除されたappの残留を防ぐ）
-    subprocess.run(
-        ["netsh", "advfirewall", "firewall", "delete", "rule", "name=Toxov"],
-        capture_output=True
-    )
+    # フラグがある場合のみ既存ルールを削除（フラグなし = ルール未登録 → deleteは不要かつ遅い）
+    if os.path.exists(FIREWALL_FLAG):
+        subprocess.run(
+            ["netsh", "advfirewall", "firewall", "delete", "rule", "name=Toxov"],
+            capture_output=True
+        )
     for path in apps:
         if os.path.exists(path):
             subprocess.run([
                 "netsh", "advfirewall", "firewall", "add", "rule",
                 "name=Toxov", "dir=out", "action=block", f"program={path}"
             ], capture_output=True)
+    # ルール追加完了をフラグに記録（次回 unblock/block 時のスキップ判定に使う）
+    _set_firewall_flag(True)
 
 
 def kill_edge_connections(log=None):
@@ -315,13 +332,16 @@ def unblock(log=None):
         if log:
             log(f"[unblock] hosts error: {e}")
 
-    # --- アプリ解除：Toxovという名前のファイアウォールルールをすべて削除 ---
-    result = subprocess.run(
-        ["netsh", "advfirewall", "firewall", "delete", "rule", "name=Toxov"],
-        capture_output=True, text=True
-    )
-    if log and result.returncode != 0:
-        log(f"[unblock] firewall error rc={result.returncode} {result.stderr.strip()}")
+    # --- アプリ解除：フラグがある場合のみ netsh でルールを削除する ---
+    # フラグなし = ルール未登録 → netsh delete（~27秒）をスキップして即時完了
+    if os.path.exists(FIREWALL_FLAG):
+        result = subprocess.run(
+            ["netsh", "advfirewall", "firewall", "delete", "rule", "name=Toxov"],
+            capture_output=True, text=True
+        )
+        if log and result.returncode != 0:
+            log(f"[unblock] firewall error rc={result.returncode} {result.stderr.strip()}")
+        _set_firewall_flag(False)
 
 
 def notify(message):
