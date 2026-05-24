@@ -527,29 +527,42 @@ def config_stream(url, log):
     設定取得インターフェース。
     将来このジェネレータをWebSocket版に丸ごと置き換える。
     サーバー不達が続く場合はエクスポネンシャルバックオフで再試行間隔を伸ばす。
+    ただしサーバー不達中もキャッシュ設定で毎 POLL_INTERVAL ブロック判定を継続し、
+    時刻によるブロック遷移（8:00 ブロック開始など）がサーバー障害に左右されないようにする。
     """
     consecutive_failures = 0
     MAX_BACKOFF = 600  # 最大10分
+    # サーバー不達時のフォールバック。起動時キャッシュをセットしておくことで
+    # polling_loop が初回サーバー到達前からでも時刻ブロック判定できる
+    last_config = load_cached_config()
+    next_server_retry = 0.0  # この time.time() 以降になったらサーバーを叩く
 
     while True:
-        try:
-            response = requests.get(url, headers=_API_HEADERS, timeout=10)
-            response.raise_for_status()
-            if consecutive_failures > 0:
-                log(f"reconnected after {consecutive_failures} failure(s)")
-            consecutive_failures = 0
-            config = response.json()
-            save_cached_config(config)  # 次回起動用にキャッシュ更新
-            yield config
-            time.sleep(POLL_INTERVAL)
-        except Exception as e:
-            consecutive_failures += 1
-            # 最初の失敗と5の倍数回目だけログに残してスパムを防ぐ
-            if consecutive_failures == 1 or consecutive_failures % 5 == 0:
-                log(f"error (#{consecutive_failures}): {e}")
-            # 30s → 60s → 120s → 240s → 最大600s でバックオフ
-            backoff = min(POLL_INTERVAL * (2 ** min(consecutive_failures - 1, 4)), MAX_BACKOFF)
-            time.sleep(backoff)
+        now = time.time()
+        if now >= next_server_retry:
+            try:
+                response = requests.get(url, headers=_API_HEADERS, timeout=10)
+                response.raise_for_status()
+                if consecutive_failures > 0:
+                    log(f"reconnected after {consecutive_failures} failure(s)")
+                consecutive_failures = 0
+                config = response.json()
+                last_config = config
+                save_cached_config(config)  # 次回起動用にキャッシュ更新
+                next_server_retry = now + POLL_INTERVAL
+            except Exception as e:
+                consecutive_failures += 1
+                # 最初の失敗と5の倍数回目だけログに残してスパムを防ぐ
+                if consecutive_failures == 1 or consecutive_failures % 5 == 0:
+                    log(f"error (#{consecutive_failures}): {e}")
+                # 30s → 60s → 120s → 240s → 最大600s でバックオフ
+                backoff = min(POLL_INTERVAL * (2 ** min(consecutive_failures - 1, 4)), MAX_BACKOFF)
+                next_server_retry = time.time() + backoff
+
+        # サーバー不達中もキャッシュ設定で毎 POLL_INTERVAL ブロック判定を継続する
+        if last_config is not None:
+            yield last_config
+        time.sleep(POLL_INTERVAL)
 
 
 def apply_config(config, current_state, last_version, log, lang="ja"):
