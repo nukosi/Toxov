@@ -7,12 +7,16 @@ import subprocess
 import ctypes
 import winreg
 import threading
+import shutil
 import requests
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 import pystray
 from PIL import Image, ImageDraw
 from comments import get_comment
+
+# エージェントのバージョン。サーバーの LATEST_AGENT_VERSION と比較して自動更新する
+VERSION = "2.0.0"
 
 # ドメイン取得時はここだけ変える
 SERVER_BASE = "https://web-production-ed8c9.up.railway.app"
@@ -21,8 +25,11 @@ SERVER_BASE = "https://web-production-ed8c9.up.railway.app"
 # 配布前に必ずRailwayで AGENT_SECRET を設定し、この値を合わせてビルドし直す
 AGENT_SECRET = "toxov-prod-abc123xyz"
 
-CONFIG_DIR   = os.path.join(os.environ["APPDATA"], "Toxov")
-CONFIG_FILE  = os.path.join(CONFIG_DIR, "config.json")
+CONFIG_DIR    = os.path.join(os.environ["APPDATA"], "Toxov")
+CONFIG_FILE   = os.path.join(CONFIG_DIR, "config.json")
+# 自動更新・Task Scheduler登録の固定インストールパス
+# 初回起動時にここへ自分自身をコピーし、以後はここから起動する
+INSTALL_PATH  = os.path.join(CONFIG_DIR, "Toxov.exe")
 # サーバー設定のローカルキャッシュ。起動直後の即時ブロック適用に使う
 CACHE_FILE      = os.path.join(CONFIG_DIR, "last_config.json")
 # ファイアウォールルールが存在するかを記録するフラグファイル
@@ -178,7 +185,7 @@ def register_autostart():
     # Windowsタスクスケジューラにログオン時の自動起動を登録する
     # RunLevel Highest = 管理者として起動（UACダイアログなし）
     # 旧名称のタスクが残っている場合は先に削除する
-    exe = sys.executable
+    exe = INSTALL_PATH  # 常に固定インストールパスで登録する
     ps = f"""
 Unregister-ScheduledTask -TaskName 'nukosisnsblocker' -Confirm:$false -ErrorAction SilentlyContinue
 Unregister-ScheduledTask -TaskName 'CutNet' -Confirm:$false -ErrorAction SilentlyContinue
@@ -191,6 +198,84 @@ $settings  = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0 -MultipleInstanc
 Register-ScheduledTask -TaskName 'Toxov' -Action $action -Trigger @($trigLogon,$trigBoot) -Principal $principal -Settings $settings -Force
 """
     subprocess.run(["powershell", "-Command", ps], capture_output=True)
+
+
+def ensure_installed():
+    """
+    exe が INSTALL_PATH から起動されていない場合、そこへコピーして再起動する。
+    これにより Task Scheduler の登録パスが常に固定され、自動更新も正しく機能する。
+    """
+    if not getattr(sys, "frozen", False):
+        return  # スクリプト実行時はスキップ
+    current = os.path.abspath(sys.executable)
+    target  = os.path.abspath(INSTALL_PATH)
+    if current.lower() == target.lower():
+        return  # 正しいパスから起動済み
+
+    # 別インスタンスが既に INSTALL_PATH で動いていれば何もせず終了する
+    test_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "Global\\Toxov")
+    already_running = ctypes.windll.kernel32.GetLastError() == 183
+    ctypes.windll.kernel32.CloseHandle(test_mutex)
+    if already_running:
+        sys.exit(0)
+
+    # INSTALL_PATH へコピーして再起動
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    try:
+        shutil.copy2(current, target)
+    except Exception:
+        return  # コピー失敗時はそのまま継続
+    ctypes.windll.shell32.ShellExecuteW(None, "runas", target, None, None, 1)
+    sys.exit(0)
+
+
+def _is_newer(remote: str, local: str) -> bool:
+    """バージョン文字列を比較して remote が local より新しいか判定する。"""
+    try:
+        return (tuple(int(x) for x in remote.split(".")) >
+                tuple(int(x) for x in local.split(".")))
+    except Exception:
+        return False
+
+
+def apply_update(url: str, log):
+    """
+    新バージョンの exe をダウンロードし、バッチスクリプト経由で自分自身を差し替えて再起動する。
+    バッチスクリプトは現プロセス終了後に実行されるため、実行中の exe を上書きできる。
+    """
+    new_exe  = INSTALL_PATH + ".new"
+    bat_path = os.path.join(CONFIG_DIR, "update.bat")
+    try:
+        log(f"update: {VERSION} → downloading new version...")
+        r = requests.get(url, timeout=120, stream=True, headers=_API_HEADERS)
+        r.raise_for_status()
+        with open(new_exe, "wb") as f:
+            for chunk in r.iter_content(chunk_size=65536):
+                f.write(chunk)
+        log("update: download complete, applying...")
+        # バッチスクリプト: 現プロセス終了を3秒待ってから差し替え・再起動する
+        bat = (
+            "@echo off\r\n"
+            "timeout /t 3 /nobreak >nul\r\n"
+            f'copy /y "{new_exe}" "{INSTALL_PATH}"\r\n'
+            f'del "{new_exe}"\r\n'
+            f'start "" "{INSTALL_PATH}"\r\n'
+            'del "%~f0"\r\n'
+        )
+        with open(bat_path, "w", encoding="ascii") as f:
+            f.write(bat)
+        subprocess.Popen(
+            [bat_path],
+            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+        )
+        sys.exit(0)  # バッチが引き継ぐのでクリーンアップ不要
+    except Exception as e:
+        log(f"update failed: {e}")
+        for p in (new_exe, bat_path):
+            try:
+                os.remove(p)
+            except Exception:
+                pass
 
 
 def load_local_config():
@@ -622,6 +707,9 @@ def main():
         relaunch_as_admin()
         return
 
+    # 固定インストールパスへの移動（初回起動時のみ実行。以後はINSTALL_PATHから起動される）
+    ensure_installed()
+
     # 管理者昇格後に二重起動チェック（非管理者プロセスはすでにsys.exit済みなので競合しない）
     mutex = ensure_single_instance()
     if mutex is None:
@@ -683,6 +771,13 @@ def main():
         last_version   = init_version
         prev_emergency = False  # 前回pollで緊急解除中だったか
         for config in config_stream(cloud_url, log):
+            # 自動更新チェック（サーバーが新バージョンを通知した場合のみ実行）
+            latest_ver = config.get("agent_version", "")
+            dl_url     = config.get("agent_download_url", "")
+            if latest_ver and dl_url and _is_newer(latest_ver, VERSION):
+                log(f"update available: {VERSION} → {latest_ver}")
+                apply_update(dl_url, log)
+                return  # apply_update が sys.exit するが念のため
             emergency = config.get("emergency_unblock", False)
             current_state, last_version, events = apply_config(
                 config, current_state, last_version, log, lang

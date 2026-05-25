@@ -90,6 +90,13 @@ def render_todo_text(template_key: str, variables: dict, deadline_time: str) -> 
     return text
 
 
+# Windowsエージェントの自動更新設定
+# LATEST_AGENT_VERSION: 配布したい新バージョン番号（例: "2.1.0"）
+# AGENT_DOWNLOAD_URL:   新バージョンのToxov.exeの直接ダウンロードURL
+# 未設定のままなら自動更新は発動しない
+LATEST_AGENT_VERSION = os.environ.get("LATEST_AGENT_VERSION", "")
+AGENT_DOWNLOAD_URL   = os.environ.get("AGENT_DOWNLOAD_URL", "")
+
 PRESET_SITES = [
     {
         "category": "cat_video",
@@ -507,6 +514,9 @@ def api_config(token):
     config["role"]            = full_user.get("role", "user")
     phase = get_phase(config["streak"], has_emergency_history(user["id"]))
     config["streak_comment"]  = get_comment(phase, "ja")
+    # Windowsエージェント自動更新情報（未設定なら空文字でエージェントはスキップする）
+    config["agent_version"]      = LATEST_AGENT_VERSION
+    config["agent_download_url"] = AGENT_DOWNLOAD_URL
     return jsonify(config)
 
 
