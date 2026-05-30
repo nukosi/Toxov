@@ -22,7 +22,7 @@ if _sentry_dsn:
     )
 from database import (init_db, load_config, save_config,
                       verify_password, create_user, get_user_by_id, get_user_by_token,
-                      set_emergency_unblock, add_event_log, get_event_logs, get_streak,
+                      set_emergency_unblock, set_block_until, add_event_log, get_event_logs, get_streak,
                       set_user_plan, has_emergency_history, get_success_rate,
                       apply_event_points, get_user_points, get_season_ranking, get_rank,
                       get_user_by_connect_code, get_user_by_email, get_user_by_username, set_user_email,
@@ -245,6 +245,15 @@ def streak_emoji(days: int) -> str:
 
 
 def is_blocking_time(config):
+    # 期間ブロック中は常時ブロック扱いにする
+    block_until = config.get("block_until")
+    if block_until:
+        try:
+            until_dt = datetime.datetime.fromisoformat(block_until)
+            if datetime.datetime.now(JST).replace(tzinfo=None) < until_dt:
+                return True
+        except Exception:
+            pass
     now = datetime.datetime.now(JST).time()
     sh, sm = map(int, config["block_start"].split(":"))
     eh, em = map(int, config["block_end"].split(":"))
@@ -394,6 +403,18 @@ def index():
         last_active_at is not None and
         (now_jst - last_active_at).total_seconds() < 90
     )
+    # 期間ブロックの表示情報を計算する（期限切れは非アクティブ扱い）
+    block_until_active  = False
+    block_until_display = None
+    _bu = config.get("block_until")
+    if _bu:
+        try:
+            _until_dt = datetime.datetime.fromisoformat(_bu)
+            if _until_dt > now_jst:
+                block_until_active  = True
+                block_until_display = _until_dt.strftime("%Y/%m/%d %H:%M")
+        except Exception:
+            pass
     return render_template("index.html", config=config, blocking=blocking,
                            saved=saved, api_token=current_user.api_token,
                            connect_code=current_user.connect_code,
@@ -415,6 +436,8 @@ def index():
                            todo_tasks=todo_tasks, completions_today=completions_today,
                            todo_stats=todo_stats, todo_templates=TODO_TEMPLATES,
                            today_weekday=today_weekday, render_todo_text=render_todo_text,
+                           block_until_active=block_until_active,
+                           block_until_display=block_until_display,
                            tab=request.args.get("tab"))
 
 
@@ -465,6 +488,34 @@ def emergency():
 @login_required
 def resume():
     set_emergency_unblock(current_user.id, False)
+    return redirect(url_for("index"))
+
+
+@app.route("/set_block_until", methods=["POST"])
+@login_required
+def set_block_until_route():
+    """期間ブロックを設定する。無料プランは最大24時間まで。"""
+    try:
+        days  = max(0, int(request.form.get("days",  0)))
+        hours = max(0, int(request.form.get("hours", 0)))
+    except ValueError:
+        return redirect(url_for("index", tab="settings"))
+    total_hours = days * 24 + hours
+    if total_hours <= 0:
+        return redirect(url_for("index", tab="settings"))
+    # 無料プランは24時間を上限とする
+    if current_user.plan != "premium" and total_hours > 24:
+        total_hours = 24
+    until = datetime.datetime.now(JST).replace(tzinfo=None) + datetime.timedelta(hours=total_hours)
+    set_block_until(current_user.id, until.strftime("%Y-%m-%dT%H:%M:%S"))
+    return redirect(url_for("index"))
+
+
+@app.route("/cancel_block_until", methods=["POST"])
+@login_required
+def cancel_block_until_route():
+    """期間ブロックをキャンセルする。"""
+    set_block_until(current_user.id, None)
     return redirect(url_for("index"))
 
 

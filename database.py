@@ -60,6 +60,8 @@ class Config(Base):
     block_end         = Column(String, nullable=False, default="21:00")
     emergency_unblock = Column(Boolean, nullable=False, default=False)
     version           = Column(Integer, nullable=False, default=0)
+    # ISO 8601 文字列（JST）。この時刻まで毎日スケジュールを無視して常時ブロックする
+    block_until       = Column(String, nullable=True, default=None)
     user              = relationship("UserModel", back_populates="config")
 
 
@@ -210,6 +212,12 @@ def _migrate():
             if "version" not in config_columns:
                 conn.execute(text("ALTER TABLE config ADD COLUMN version INTEGER DEFAULT 0"))
                 conn.commit()
+        # config テーブルに block_until がなければ追加（期間ブロック機能）
+        if "config" in inspector.get_table_names():
+            config_columns = [c["name"] for c in inspector.get_columns("config")]
+            if "block_until" not in config_columns:
+                conn.execute(text("ALTER TABLE config ADD COLUMN block_until TEXT DEFAULT NULL"))
+                conn.commit()
         # 既存ユーザーの user_points エントリが未作成なら初期化する
         users = conn.execute(text("SELECT id FROM users")).fetchall()
         for (uid,) in users:
@@ -354,7 +362,19 @@ def load_config(user_id):
             "sites":            [s.domain for s in sites],
             "apps":             [a.path for a in apps],
             "emergency_unblock": config.emergency_unblock or False,
+            # ISO 8601 文字列（JST、tzinfoなし）。この時刻まで常時ブロックする
+            "block_until":      config.block_until or None,
         }
+
+
+def set_block_until(user_id, until_iso: str | None):
+    """期間ブロックの終了日時をISO文字列（JST・tzinfoなし）で保存する。Noneでクリア。"""
+    with Session(engine) as session:
+        config = session.query(Config).filter_by(user_id=user_id).first()
+        if config:
+            config.block_until = until_iso
+            config.version = (config.version or 0) + 1
+            session.commit()
 
 
 def set_emergency_unblock(user_id, value: bool):

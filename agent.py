@@ -335,10 +335,18 @@ def set_doh_policy(disable: bool):
 
 def should_be_blocked(config):
     """ローカル時刻で判定。サーバー不要。"""
-    now = datetime.datetime.now(JST).time()
+    now_jst = datetime.datetime.now(JST).replace(tzinfo=None)
+    # 期間ブロック中はスケジュールを無視して常時ブロック
+    block_until = config.get("block_until")
+    if block_until:
+        try:
+            if now_jst < datetime.datetime.fromisoformat(block_until):
+                return True
+        except Exception:
+            pass
     sh, sm = map(int, config["block_start"].split(":"))
     eh, em = map(int, config["block_end"].split(":"))
-    return datetime.time(sh, sm) <= now < datetime.time(eh, em)
+    return datetime.time(sh, sm) <= now_jst.time() < datetime.time(eh, em)
 
 
 def block(sites, apps):
