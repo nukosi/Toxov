@@ -407,6 +407,43 @@ def kill_edge_connections(log=None):
                 log(f"[kill_browser] {exe} error: {e}")
 
 
+def kill_browser_tabs(log=None):
+    """
+    ブロック開始時にブラウザのレンダラープロセス（タブ本体）を終了する。
+    タブがクラッシュ状態になり自動リロードが走るが、
+    その時点でhostsブロックが効くため即時ブロックが実現される。
+    ブラウザ自体は残るのでタブの一覧は消えない。
+
+    Firefox はプロセス構造が異なるため全体を終了する。
+    Firefox は次回起動時にセッション復元を提案するのでタブは戻せる。
+    """
+    # Chrome / Edge のレンダラープロセス（--type=renderer）だけを終了する
+    for exe in ("chrome.exe", "msedge.exe"):
+        try:
+            result = subprocess.run(
+                ["wmic", "process", "where",
+                 f"name='{exe}' and commandline like '%--type=renderer%'",
+                 "get", "ProcessId", "/format:value"],
+                capture_output=True, text=True, timeout=15,
+            )
+            killed = 0
+            for line in result.stdout.strip().splitlines():
+                if "=" in line:
+                    pid = line.split("=")[-1].strip()
+                    if pid.isdigit():
+                        subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
+                        killed += 1
+            if log and killed > 0:
+                log(f"[block] {exe} renderer x{killed} killed")
+        except Exception as e:
+            if log:
+                log(f"[block] renderer kill error ({exe}): {e}")
+    # Firefox はメインプロセスを終了（次回起動時にセッション復元あり）
+    result = subprocess.run(["taskkill", "/F", "/IM", "firefox.exe"], capture_output=True)
+    if log and result.returncode == 0:
+        log("[block] firefox.exe killed")
+
+
 def unblock(log=None):
     # --- Edge/ChromeのDoHポリシーを削除してデフォルト動作に戻す ---
     set_doh_policy(disable=False)
@@ -792,8 +829,9 @@ def main():
                 pass
             for event in events:
                 if event == "block_start":
-                    # EdgeのNetworkServiceを再起動してDNSキャッシュをクリアする
-                    # DoHポリシーの即時反映とhostsファイルの即時適用のために毎回実行する
+                    # レンダラープロセスを終了してタブを強制リロードさせる（即時ブロックのため）
+                    kill_browser_tabs(log)
+                    # NetworkServiceも再起動してDNSキャッシュをクリアする
                     kill_edge_connections(log)
                     if prev_emergency:
                         notify(s["notify_reblock"])
