@@ -407,18 +407,22 @@ details > summary::-webkit-details-marker { display: none; }
       <p style="font-size:.78rem; color:var(--dim); margin-bottom:14px;">スケジュールを無視して、指定した期間だけ常時ブロックします。緊急解除は引き続き使えます。</p>
       <form action="/set_block_until" method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px;">
           <div style="display:flex; align-items:center; gap:6px;">
-            <input type="number" name="days" min="0" max="{{ 365 if plan == 'premium' else 1 }}" value="0"
+            <input type="number" id="bu-days" name="days" min="0" max="{{ 365 if plan == 'premium' else 1 }}" value="0"
+                   oninput="updateBlockUntilPreview()"
                    style="width:64px; padding:8px 10px; text-align:center; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--rs); color:var(--text); font-size:.95rem; font-family:inherit;">
             <span style="font-size:.82rem; color:var(--muted);">日</span>
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
-            <input type="number" name="hours" min="0" max="{{ 23 if plan == 'premium' else 24 }}" value="{{ 24 if plan != 'premium' else 0 }}"
+            <input type="number" id="bu-hours" name="hours" min="0" max="{{ 23 if plan == 'premium' else 24 }}" value="{{ 24 if plan != 'premium' else 0 }}"
+                   oninput="updateBlockUntilPreview()"
                    style="width:64px; padding:8px 10px; text-align:center; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--rs); color:var(--text); font-size:.95rem; font-family:inherit;">
             <span style="font-size:.82rem; color:var(--muted);">時間</span>
           </div>
         </div>
+        <!-- 終了日時プレビュー -->
+        <div id="block-until-preview" style="font-size:.78rem; color:var(--accent); margin-bottom:10px; min-height:1.1em;"></div>
         {% if plan != 'premium' %}
         <p style="font-size:.72rem; color:var(--muted); margin-bottom:10px;">無料プランは最大24時間まで</p>
         {% endif %}
@@ -1051,7 +1055,27 @@ details > summary::-webkit-details-marker { display: none; }
       btn.classList.toggle('active', btn.dataset.domains.split(',').every(d => cur.includes(d)));
     });
   }
-  document.addEventListener('DOMContentLoaded', syncPresets);
+  document.addEventListener('DOMContentLoaded', () => {
+    syncPresets();
+    updateBlockUntilPreview();
+  });
+
+  // ─── 期間ブロック終了日時プレビュー ───
+  function updateBlockUntilPreview() {
+    const el = document.getElementById('block-until-preview');
+    if (!el) return;
+    const days  = parseInt(document.getElementById('bu-days')?.value)  || 0;
+    const hours = parseInt(document.getElementById('bu-hours')?.value) || 0;
+    if (days === 0 && hours === 0) { el.textContent = ''; return; }
+    const end = new Date();
+    end.setDate(end.getDate() + days);
+    end.setHours(end.getHours() + hours);
+    const m  = end.getMonth() + 1;
+    const d  = end.getDate();
+    const hh = String(end.getHours()).padStart(2, '0');
+    const mm = String(end.getMinutes()).padStart(2, '0');
+    el.textContent = `${m}月${d}日 ${hh}:${mm} に終了`;
+  }
 
   // ─── Todo ───
   {% if role == "admin" %}
