@@ -34,7 +34,7 @@ from database import (init_db, load_config, save_config,
                       set_otp, verify_otp,
                       create_todo_task, get_todo_tasks, delete_todo_task,
                       toggle_todo_completion, get_todo_completions_today, get_todo_stats,
-                      recalculate_all_season_points)
+                      recalculate_all_season_points, get_season_debug_data)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit, count_unique_domains, normalize_domain
 from mailer import send_password_reset, send_otp_email, send_contact_email
@@ -540,6 +540,15 @@ def admin_recalculate_points():
         return redirect(url_for("index"))
     recalculate_all_season_points()
     return redirect(url_for("index"))
+
+
+@app.route("/admin/season-debug")
+@login_required
+def admin_season_debug():
+    """今月の各日について block_start/block_end/point の有無を一覧表示する。admin専用。"""
+    if current_user.role != "admin":
+        return jsonify({"error": "admin only"}), 403
+    return jsonify(get_season_debug_data())
 
 
 @app.route("/api/connect/<code>")

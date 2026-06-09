@@ -736,6 +736,54 @@ def recalculate_all_season_points():
         session.commit()
 
 
+def get_season_debug_data() -> list:
+    """今月の各日について block_start / block_end / point の有無を全ユーザー分返す。admin用デバッグ関数。"""
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    season_start = now.date().replace(day=1)
+    result = []
+    with Session(engine) as session:
+        users = session.query(UserModel).all()
+        for user in users:
+            uid = user.id
+            days = []
+            target = season_start
+            while target <= now.date():
+                ds = datetime.datetime.combine(target, datetime.time.min)
+                de = ds + datetime.timedelta(days=1)
+                has_start = session.query(EventLog).filter(
+                    EventLog.user_id == uid, EventLog.event == "block_start",
+                    EventLog.created_at >= ds, EventLog.created_at < de,
+                ).first() is not None
+                has_end = session.query(EventLog).filter(
+                    EventLog.user_id == uid, EventLog.event == "block_end",
+                    EventLog.created_at >= ds, EventLog.created_at < de,
+                ).first() is not None
+                has_emerg = session.query(EventLog).filter(
+                    EventLog.user_id == uid, EventLog.event == "emergency_unblock",
+                    EventLog.created_at >= ds, EventLog.created_at < de,
+                ).first() is not None
+                day_reason = f"daily_{target.isoformat()}"
+                has_point = session.query(PointLog).filter(
+                    PointLog.user_id == uid,
+                    or_(
+                        PointLog.reason == day_reason,
+                        and_(PointLog.reason == "daily_completion",
+                             PointLog.created_at >= ds, PointLog.created_at < de),
+                    ),
+                ).first() is not None
+                days.append({
+                    "date":        target.isoformat(),
+                    "block_start": has_start,
+                    "block_end":   has_end,
+                    "emergency":   has_emerg,
+                    "point":       has_point,
+                })
+                target += datetime.timedelta(days=1)
+            result.append({"user": user.username, "days": days})
+    return result
+
+
 def get_user_points(user_id) -> dict:
     with Session(engine) as session:
         pts = session.get(UserPoints, user_id)
