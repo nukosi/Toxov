@@ -799,6 +799,15 @@ details > summary::-webkit-details-marker { display: none; }
     </div>
   </div>
 
+  <div class="card" style="margin-top:12px;">
+    <div class="card-label">シーズンポイント再計算</div>
+    <p style="font-size:.82rem; color:var(--dim); margin-bottom:14px;">今月の全ユーザーのシーズンポイントを event_logs から再計算して不足分を補填する。重複付与は起きない。</p>
+    <form action="/admin/recalculate-points" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-ghost" style="color:var(--warning); border-color:#4a3400;">ポイント再計算を実行</button>
+    </form>
+  </div>
+
 </div>
 {% endif %}
 

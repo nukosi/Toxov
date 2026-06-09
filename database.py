@@ -2,7 +2,7 @@ import os
 import json
 import secrets
 import string
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, DateTime, or_, and_
 import datetime
 from sqlalchemy.orm import declarative_base, Session, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -634,6 +634,57 @@ def _record_point(session, pts, user_id, amount, reason, now, affect_lifetime):
     session.add(PointLog(user_id=user_id, amount=amount, reason=reason, created_at=now))
 
 
+def _try_award_day(session, pts, user_id, for_date, now):
+    """for_date の完了ポイントを付与する。block_start なし・緊急解除あり・付与済みの場合はスキップ。
+
+    reason には "daily_YYYY-MM-DD" を使うため、block_end 側との重複付与を日付ベースで防止できる。
+    旧形式 "daily_completion" は created_at の日付を見て重複チェックする。
+    """
+    day_start = datetime.datetime.combine(for_date, datetime.time.min)
+    day_end   = day_start + datetime.timedelta(days=1)
+
+    had_start = session.query(EventLog).filter(
+        EventLog.user_id == user_id,
+        EventLog.event == "block_start",
+        EventLog.created_at >= day_start,
+        EventLog.created_at < day_end,
+    ).first() is not None
+    if not had_start:
+        return
+
+    had_emergency = session.query(EventLog).filter(
+        EventLog.user_id == user_id,
+        EventLog.event == "emergency_unblock",
+        EventLog.created_at >= day_start,
+        EventLog.created_at < day_end,
+    ).first() is not None
+    if had_emergency:
+        return
+
+    day_reason = f"daily_{for_date.isoformat()}"
+    # 旧形式（daily_completion）か新形式（daily_YYYY-MM-DD）どちらかがあれば重複とみなす
+    already = session.query(PointLog).filter(
+        PointLog.user_id == user_id,
+        or_(
+            PointLog.reason == day_reason,
+            and_(
+                PointLog.reason == "daily_completion",
+                PointLog.created_at >= day_start,
+                PointLog.created_at < day_end,
+            ),
+        ),
+    ).first() is not None
+    if already:
+        return
+
+    _record_point(session, pts, user_id, 1, day_reason, now, affect_lifetime=True)
+    streak = _compute_streak_in_session(session, user_id, now)
+    if streak > 0 and streak % 30 == 0:
+        _record_point(session, pts, user_id, 10, f"streak_{streak}", now, affect_lifetime=True)
+    elif streak > 0 and streak % 7 == 0:
+        _record_point(session, pts, user_id, 3, f"streak_{streak}", now, affect_lifetime=True)
+
+
 def apply_event_points(user_id: int, event: str):
     JST = datetime.timezone(datetime.timedelta(hours=9))
     now = datetime.datetime.now(JST).replace(tzinfo=None)
@@ -644,26 +695,15 @@ def apply_event_points(user_id: int, event: str):
             session.add(pts)
 
         if event == "block_end":
-            # 直近のblock_start以降にemergency_unblockがあれば失敗セッション
-            last_start = (
-                session.query(EventLog)
-                .filter_by(user_id=user_id, event="block_start")
-                .order_by(EventLog.id.desc())
-                .first()
-            )
-            had_emergency = last_start and session.query(EventLog).filter(
-                EventLog.user_id == user_id,
-                EventLog.event == "emergency_unblock",
-                EventLog.created_at > last_start.created_at,
-            ).first() is not None
+            # 当日の完了ポイントを付与する（PCが21:00に起動している場合）
+            _try_award_day(session, pts, user_id, now.date(), now)
 
-            if not had_emergency:
-                _record_point(session, pts, user_id, 1, "daily_completion", now, affect_lifetime=True)
-                streak = _compute_streak_in_session(session, user_id, now)
-                if streak > 0 and streak % 30 == 0:
-                    _record_point(session, pts, user_id, 10, f"streak_{streak}", now, affect_lifetime=True)
-                elif streak > 0 and streak % 7 == 0:
-                    _record_point(session, pts, user_id, 3, f"streak_{streak}", now, affect_lifetime=True)
+        elif event == "block_start":
+            # 前日の完了ポイントを補完付与する。
+            # PCが21:00に起動していなくてblock_endが発火しなかった場合でも、
+            # 翌朝のblock_startで前日分を遡ってポイントが付く。
+            yesterday = now.date() - datetime.timedelta(days=1)
+            _try_award_day(session, pts, user_id, yesterday, now)
 
         elif event == "emergency_unblock":
             # シーズンポイントのみ -6pt（0未満にしない）
@@ -671,6 +711,25 @@ def apply_event_points(user_id: int, event: str):
             if deduct > 0:
                 _record_point(session, pts, user_id, -deduct, "emergency_unblock", now, affect_lifetime=False)
 
+        session.commit()
+
+
+def recalculate_all_season_points():
+    """今月の全ユーザーのシーズンポイントを event_logs から再計算して補填する。
+    既に付与済みの日はスキップするため重複付与は起きない。
+    管理者が手動トリガーするための関数。
+    """
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
+    season_start_date = now.date().replace(day=1)  # 今月1日
+
+    with Session(engine) as session:
+        all_pts = session.query(UserPoints).all()
+        for pts in all_pts:
+            target = season_start_date
+            while target <= now.date():
+                _try_award_day(session, pts, pts.user_id, target, now)
+                target += datetime.timedelta(days=1)
         session.commit()
 
 

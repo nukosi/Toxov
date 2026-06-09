@@ -33,7 +33,8 @@ from database import (init_db, load_config, save_config,
                       get_premium_count, get_user_rank_position,
                       set_otp, verify_otp,
                       create_todo_task, get_todo_tasks, delete_todo_task,
-                      toggle_todo_completion, get_todo_completions_today, get_todo_stats)
+                      toggle_todo_completion, get_todo_completions_today, get_todo_stats,
+                      recalculate_all_season_points)
 from comments import get_comment, get_phase
 from plans import get_limits, within_site_limit, within_app_limit, count_unique_domains, normalize_domain
 from mailer import send_password_reset, send_otp_email, send_contact_email
@@ -528,6 +529,16 @@ def admin_set_plan():
     plan = request.form.get("plan")
     if plan in ("free", "premium"):
         set_user_plan(current_user.id, plan)
+    return redirect(url_for("index"))
+
+
+@app.route("/admin/recalculate-points", methods=["POST"])
+@login_required
+def admin_recalculate_points():
+    """今月のシーズンポイントをevent_logsから再計算して不足分を補填する。admin専用。"""
+    if current_user.role != "admin":
+        return redirect(url_for("index"))
+    recalculate_all_season_points()
     return redirect(url_for("index"))
 
 
