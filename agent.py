@@ -417,39 +417,17 @@ def kill_edge_connections(log=None):
 
 def kill_browser_tabs(log=None):
     """
-    ブロック開始時にブラウザのレンダラープロセス（タブ本体）を終了する。
-    タブがクラッシュ状態になり自動リロードが走るが、
-    その時点でhostsブロックが効くため即時ブロックが実現される。
-    ブラウザ自体は残るのでタブの一覧は消えない。
+    ブロック開始時にすべてのブラウザプロセスを終了する。
 
-    Firefox はプロセス構造が異なるため全体を終了する。
-    Firefox は次回起動時にセッション復元を提案するのでタブは戻せる。
+    レンダラーだけを kill しても NetworkService が TCP 接続プールを保持し続けるため、
+    再読み込みで既存接続が再利用されてブロックを抜けられてしまう。
+    全プロセスを終了することですべての接続を確実に切断する。
+    Chrome・Edge・Firefox はセッション復元機能を持つため次回起動時にタブを戻せる。
     """
-    # Chrome / Edge のレンダラープロセス（--type=renderer）だけを終了する
-    for exe in ("chrome.exe", "msedge.exe"):
-        try:
-            result = subprocess.run(
-                ["wmic", "process", "where",
-                 f"name='{exe}' and commandline like '%--type=renderer%'",
-                 "get", "ProcessId", "/format:value"],
-                capture_output=True, text=True, timeout=15,
-            )
-            killed = 0
-            for line in result.stdout.strip().splitlines():
-                if "=" in line:
-                    pid = line.split("=")[-1].strip()
-                    if pid.isdigit():
-                        subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
-                        killed += 1
-            if log and killed > 0:
-                log(f"[block] {exe} renderer x{killed} killed")
-        except Exception as e:
-            if log:
-                log(f"[block] renderer kill error ({exe}): {e}")
-    # Firefox はメインプロセスを終了（次回起動時にセッション復元あり）
-    result = subprocess.run(["taskkill", "/F", "/IM", "firefox.exe"], capture_output=True)
-    if log and result.returncode == 0:
-        log("[block] firefox.exe killed")
+    for exe in ("chrome.exe", "msedge.exe", "firefox.exe"):
+        result = subprocess.run(["taskkill", "/F", "/IM", exe], capture_output=True)
+        if log and result.returncode == 0:
+            log(f"[block] {exe} killed")
 
 
 def unblock(log=None):
