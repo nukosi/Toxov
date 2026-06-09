@@ -2,7 +2,7 @@ import os
 import json
 import secrets
 import string
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, DateTime, or_, and_
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, DateTime, or_, and_, func
 import datetime
 from sqlalchemy.orm import declarative_base, Session, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -719,20 +719,29 @@ def apply_event_points(user_id: int, event: str):
 
 def recalculate_all_season_points():
     """今月の全ユーザーのシーズンポイントを event_logs から再計算して補填する。
-    既に付与済みの日はスキップするため重複付与は起きない。
-    管理者が手動トリガーするための関数。
+    欠けているPointLogを補完した後、season_pointsをPointLogの合計から再設定する。
+    これにより加算方式の累積ズレを解消する。
     """
     JST = datetime.timezone(datetime.timedelta(hours=9))
     now = datetime.datetime.now(JST).replace(tzinfo=None)
     season_start_date = now.date().replace(day=1)  # 今月1日
+    season_start_dt = datetime.datetime.combine(season_start_date, datetime.time.min)
 
     with Session(engine) as session:
         all_pts = session.query(UserPoints).all()
         for pts in all_pts:
+            # 欠けているPointLogを補完する（重複付与なし）
             target = season_start_date
             while target <= now.date():
                 _try_award_day(session, pts, pts.user_id, target, now)
                 target += datetime.timedelta(days=1)
+            # season_pointsをPointLogの実合計から再設定してズレを修正する
+            session.flush()
+            total = session.query(func.sum(PointLog.amount)).filter(
+                PointLog.user_id == pts.user_id,
+                PointLog.created_at >= season_start_dt,
+            ).scalar() or 0
+            pts.season_points = max(0, total)
         session.commit()
 
 
