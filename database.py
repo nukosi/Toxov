@@ -635,21 +635,24 @@ def _record_point(session, pts, user_id, amount, reason, now, affect_lifetime):
 
 
 def _try_award_day(session, pts, user_id, for_date, now):
-    """for_date の完了ポイントを付与する。block_start なし・緊急解除あり・付与済みの場合はスキップ。
+    """for_date の完了ポイントを付与する。ブロック活動なし・緊急解除あり・付与済みの場合はスキップ。
 
-    reason には "daily_YYYY-MM-DD" を使うため、block_end 側との重複付与を日付ベースで防止できる。
+    PCがブロック時間中に再起動した日は block_start が発火せず block_end のみ残る。
+    どちらか一方でもあれば「その日はブロックしていた」とみなす。
+    reason には "daily_YYYY-MM-DD" を使い日付ベースで重複付与を防止する。
     旧形式 "daily_completion" は created_at の日付を見て重複チェックする。
     """
     day_start = datetime.datetime.combine(for_date, datetime.time.min)
     day_end   = day_start + datetime.timedelta(days=1)
 
-    had_start = session.query(EventLog).filter(
+    # block_start か block_end どちらかがあればその日はブロックしていたとみなす
+    had_block_activity = session.query(EventLog).filter(
         EventLog.user_id == user_id,
-        EventLog.event == "block_start",
+        EventLog.event.in_(["block_start", "block_end"]),
         EventLog.created_at >= day_start,
         EventLog.created_at < day_end,
     ).first() is not None
-    if not had_start:
+    if not had_block_activity:
         return
 
     had_emergency = session.query(EventLog).filter(
