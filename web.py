@@ -591,6 +591,46 @@ def api_config(token):
     return jsonify(config)
 
 
+@app.route("/api/block-until/set/<token>", methods=["POST"])
+@csrf.exempt
+def api_set_block_until(token):
+    """モバイルアプリから期間ブロックを設定するエンドポイント。無料プランは最大24時間まで。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    data = request.get_json(silent=True) or {}
+    try:
+        days  = max(0, int(data.get("days",  0)))
+        hours = max(0, int(data.get("hours", 0)))
+    except (ValueError, TypeError):
+        return jsonify({"error": "invalid parameters"}), 400
+    total_hours = days * 24 + hours
+    if total_hours <= 0:
+        return jsonify({"error": "duration must be positive"}), 400
+    # 無料プランは24時間を上限とする
+    full_user = get_user_by_id(user["id"])
+    if full_user.get("plan") != "premium" and total_hours > 24:
+        total_hours = 24
+    until = datetime.datetime.now(JST).replace(tzinfo=None) + datetime.timedelta(hours=total_hours)
+    set_block_until(user["id"], until.strftime("%Y-%m-%dT%H:%M:%S"))
+    return jsonify({"ok": True, "until": until.strftime("%Y-%m-%dT%H:%M:%S")})
+
+
+@app.route("/api/block-until/cancel/<token>", methods=["POST"])
+@csrf.exempt
+def api_cancel_block_until(token):
+    """モバイルアプリから期間ブロックをキャンセルするエンドポイント。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    set_block_until(user["id"], None)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/emergency/<token>", methods=["POST"])
 @csrf.exempt
 def api_emergency(token):
