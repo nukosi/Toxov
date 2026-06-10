@@ -118,10 +118,6 @@ TRANSLATIONS = {
         "no_data": "データなし",
 
         # Billing tab
-        "earlybird_badge": "先着50名・6/30まで限定",
-        "earlybird_forever": "このまま永久にこの価格",
-        "earlybird_discount": "通常年額 ¥5,000 → 40%オフ",
-        "earlybird_remaining": "残り{n}名",
         "monthly_label": "月額",
         "yearly_label": "年額",
         "monthly_cancel": "いつでも解約可",
@@ -280,10 +276,6 @@ TRANSLATIONS = {
         "no_data": "No data",
 
         # Billing tab
-        "earlybird_badge": "First 50 · Ends June 30",
-        "earlybird_forever": "This price is locked forever",
-        "earlybird_discount": "Regular price ¥5,000/yr → 40% off",
-        "earlybird_remaining": "{n} spots left",
         "monthly_label": "Monthly",
         "yearly_label": "Yearly",
         "monthly_cancel": "Cancel anytime",

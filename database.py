@@ -634,13 +634,14 @@ def _record_point(session, pts, user_id, amount, reason, now, affect_lifetime):
     session.add(PointLog(user_id=user_id, amount=amount, reason=reason, created_at=now))
 
 
-def _try_award_day(session, pts, user_id, for_date, now):
+def _try_award_day(session, pts, user_id, for_date, now, award_streak=True):
     """for_date の完了ポイントを付与する。ブロック活動なし・緊急解除あり・付与済みの場合はスキップ。
 
     PCがブロック時間中に再起動した日は block_start が発火せず block_end のみ残る。
     どちらか一方でもあれば「その日はブロックしていた」とみなす。
     reason には "daily_YYYY-MM-DD" を使い日付ベースで重複付与を防止する。
     旧形式 "daily_completion" は created_at の日付を見て重複チェックする。
+    award_streak=False の場合はストリークボーナスを付与しない（recalculate 用）。
     """
     day_start = datetime.datetime.combine(for_date, datetime.time.min)
     day_end   = day_start + datetime.timedelta(days=1)
@@ -681,11 +682,19 @@ def _try_award_day(session, pts, user_id, for_date, now):
         return
 
     _record_point(session, pts, user_id, 1, day_reason, now, affect_lifetime=True)
+    if not award_streak:
+        return
     streak = _compute_streak_in_session(session, user_id, now)
     if streak > 0 and streak % 30 == 0:
-        _record_point(session, pts, user_id, 10, f"streak_{streak}", now, affect_lifetime=True)
+        streak_reason = f"streak_{streak}"
+        # 同じストリーク達成ボーナスの重複付与を防止する
+        if not session.query(PointLog).filter_by(user_id=user_id, reason=streak_reason).first():
+            _record_point(session, pts, user_id, 10, streak_reason, now, affect_lifetime=True)
     elif streak > 0 and streak % 7 == 0:
-        _record_point(session, pts, user_id, 3, f"streak_{streak}", now, affect_lifetime=True)
+        streak_reason = f"streak_{streak}"
+        # 同じストリーク達成ボーナスの重複付与を防止する
+        if not session.query(PointLog).filter_by(user_id=user_id, reason=streak_reason).first():
+            _record_point(session, pts, user_id, 3, streak_reason, now, affect_lifetime=True)
 
 
 def apply_event_points(user_id: int, event: str):
@@ -730,17 +739,26 @@ def recalculate_all_season_points():
     with Session(engine) as session:
         all_pts = session.query(UserPoints).all()
         for pts in all_pts:
-            # 欠けているPointLogを補完する（重複付与なし）
+            # 欠けているPointLogを補完する（recalculate 時はストリークボーナスをスキップ）
             target = season_start_date
             while target <= now.date():
-                _try_award_day(session, pts, pts.user_id, target, now)
+                _try_award_day(session, pts, pts.user_id, target, now, award_streak=False)
                 target += datetime.timedelta(days=1)
             # season_pointsをPointLogの実合計から再設定してズレを修正する
+            # streak_N は重複エントリが存在しうるため reason ごとに1件だけ集計する
             session.flush()
-            total = session.query(func.sum(PointLog.amount)).filter(
+            all_logs = session.query(PointLog).filter(
                 PointLog.user_id == pts.user_id,
                 PointLog.created_at >= season_start_dt,
-            ).scalar() or 0
+            ).all()
+            seen_streak_reasons: set = set()
+            total = 0
+            for log in all_logs:
+                if log.reason.startswith("streak_"):
+                    if log.reason in seen_streak_reasons:
+                        continue  # 重複ストリークボーナスを除外
+                    seen_streak_reasons.add(log.reason)
+                total += log.amount
             pts.season_points = max(0, total)
         session.commit()
 
@@ -949,7 +967,7 @@ def get_user_by_stripe_customer_id(customer_id: str):
 
 
 def get_premium_count() -> int:
-    """現在のPremiumユーザー数を返す（アーリーバード枠管理用）。"""
+    """現在のPremiumユーザー数を返す。"""
     with Session(engine) as session:
         return session.query(UserModel).filter_by(plan="premium").count()
 

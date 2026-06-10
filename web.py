@@ -30,7 +30,7 @@ from database import (init_db, load_config, save_config,
                       add_app_to_config, record_first_save, record_first_sync, get_analytics,
                       set_stripe_subscription, get_user_by_stripe_customer_id,
                       get_streak_shield, use_streak_shield,
-                      get_premium_count, get_user_rank_position,
+                      get_user_rank_position,
                       set_otp, verify_otp,
                       create_todo_task, get_todo_tasks, delete_todo_task,
                       toggle_todo_completion, get_todo_completions_today, get_todo_stats,
@@ -171,26 +171,12 @@ STRIPE_SECRET_KEY      = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET  = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_PRICE_MONTHLY   = os.environ.get("STRIPE_PRICE_MONTHLY", "").strip()
 STRIPE_PRICE_YEARLY    = os.environ.get("STRIPE_PRICE_YEARLY", "").strip()
-STRIPE_PRICE_EARLYBIRD = os.environ.get("STRIPE_PRICE_EARLYBIRD", "").strip()
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
     stripe.timeout = 15
 
 # RailwayサーバーはUTCなので、表示・判定にはJSTに変換して使う
 JST = datetime.timezone(datetime.timedelta(hours=9))
-
-# アーリーバード: 先着50名 または 6/30 23:59 JST まで（先に達した方が優先）
-EARLYBIRD_MAX      = 50
-EARLYBIRD_DEADLINE = datetime.datetime(2026, 6, 30, 23, 59, 0)  # tzinfo なし・JST 想定
-
-
-def _earlybird_status() -> dict:
-    """アーリーバードが購入可能か・残り枠数を返す。"""
-    now_jst   = datetime.datetime.now(JST).replace(tzinfo=None)
-    count     = get_premium_count()
-    remaining = max(0, EARLYBIRD_MAX - count)
-    available = remaining > 0 and now_jst <= EARLYBIRD_DEADLINE
-    return {"available": available, "remaining": remaining}
 
 
 # gunicornはif __name__ == "__main__"を通らないのでここで初期化する
@@ -345,10 +331,7 @@ def logout():
 @app.route("/en")
 def landing_en():
     flask_session["lang"] = "en"
-    eb = _earlybird_status()
-    return render_template("landing_en.html",
-                           earlybird_available=eb["available"],
-                           earlybird_remaining=eb["remaining"])
+    return render_template("landing_en.html")
 
 
 @app.route("/ja")
@@ -367,10 +350,7 @@ def index():
             flask_session["lang"] = lang
         if flask_session.get("lang") == "en":
             return redirect(url_for("landing_en"))
-        eb = _earlybird_status()
-        return render_template("landing.html",
-                               earlybird_available=eb["available"],
-                               earlybird_remaining=eb["remaining"])
+        return render_template("landing.html")
     config   = load_config(current_user.id)
     blocking = is_blocking_time(config)
     saved    = request.args.get("saved", False)
@@ -390,7 +370,6 @@ def index():
     limits        = get_limits(current_user.plan)
     streak_shield = get_streak_shield(current_user.id)
     user_rank     = get_user_rank_position(current_user.id)
-    eb            = _earlybird_status()
     analytics = get_analytics() if current_user.role == "admin" else None
     todo_tasks        = get_todo_tasks(current_user.id) if current_user.role == "admin" else []
     completions_today = get_todo_completions_today(current_user.id) if current_user.role == "admin" else set()
@@ -425,15 +404,12 @@ def index():
                            plan=current_user.plan, limits=limits,
                            streak_shield=streak_shield,
                            user_rank=user_rank,
-                           earlybird_available=eb["available"],
-                           earlybird_remaining=eb["remaining"],
                            role=current_user.role, presets=PRESET_SITES,
                            analytics=analytics, agent_connected=agent_connected,
                            payment=request.args.get("payment"),
                            plan_expires_at=user_data.get("plan_expires_at"),
                            stripe_price_monthly=STRIPE_PRICE_MONTHLY,
                            stripe_price_yearly=STRIPE_PRICE_YEARLY,
-                           stripe_price_earlybird=STRIPE_PRICE_EARLYBIRD,
                            todo_tasks=todo_tasks, completions_today=completions_today,
                            todo_stats=todo_stats, todo_templates=TODO_TEMPLATES,
                            today_weekday=today_weekday, render_todo_text=render_todo_text,
@@ -755,7 +731,6 @@ def api_mobile_plans(token):
     plan_defs = [
         ("monthly",   STRIPE_PRICE_MONTHLY,   "月額プラン"),
         ("yearly",    STRIPE_PRICE_YEARLY,     "年額プラン"),
-        ("earlybird", STRIPE_PRICE_EARLYBIRD,  "アーリーバード年額"),
     ]
     plans = []
     for plan_id, price_id, label in plan_defs:
@@ -794,7 +769,6 @@ def api_mobile_checkout(token):
     price_map = {
         "monthly":   STRIPE_PRICE_MONTHLY,
         "yearly":    STRIPE_PRICE_YEARLY,
-        "earlybird": STRIPE_PRICE_EARLYBIRD,
     }
     price_id = price_map.get(plan_name) or STRIPE_PRICE_MONTHLY
     if not price_id:
@@ -1057,7 +1031,7 @@ def contact_en():
 @login_required
 def billing_checkout():
     price_id    = request.form.get("price_id", "").strip()
-    valid_prices = {STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY, STRIPE_PRICE_EARLYBIRD} - {""}
+    valid_prices = {STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY} - {""}
     if price_id not in valid_prices or not STRIPE_SECRET_KEY:
         return redirect(url_for("index"))
     try:

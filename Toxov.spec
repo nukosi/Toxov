@@ -5,8 +5,8 @@ a = Analysis(
     ['agent.py'],
     pathex=[],
     binaries=[],
-    datas=[('tray_icon.png', '.')],
-    hiddenimports=['pystray._win32'],
+    datas=[('tray_icon.png', '.'), ('comments.py', '.')],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -35,5 +35,4 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icon.ico',
 )

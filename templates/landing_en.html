@@ -65,18 +65,6 @@
     .btn-primary { background: var(--accent); color: #fff; }
     .btn-ghost   { background: transparent; color: #aaa; border: 1px solid #333; }
 
-    .earlybird-banner {
-      background: linear-gradient(90deg, rgba(249,115,22,0.15), rgba(249,115,22,0.08));
-      border-bottom: 1px solid rgba(249,115,22,0.2);
-      text-align: center;
-      padding: 10px 24px;
-      font-size: .82rem;
-      color: var(--accent);
-      font-weight: 600;
-      letter-spacing: .3px;
-    }
-    .earlybird-banner span { color: #e0e0e0; font-weight: 400; margin-left: 8px; }
-
     .hero {
       text-align: center;
       padding: 100px 24px 80px;
@@ -265,13 +253,6 @@
 </head>
 <body>
 
-  {% if earlybird_available %}
-  <div class="earlybird-banner">
-    🎉 Early Bird — ¥3,000/year (locked forever)
-    <span>First 50 users · Ends June 30 · {{ earlybird_remaining }} spots left · 7-day free trial</span>
-  </div>
-  {% endif %}
-
   <nav>
     <span class="nav-logo">Toxov</span>
     <div class="nav-links">
@@ -346,16 +327,7 @@
         <a href="/register" class="plan-cta ghost">Get started free</a>
       </div>
 
-      {% if earlybird_available %}
-      <div class="plan-card featured">
-        <div class="plan-badge">First 50 · Ends June 30</div>
-        <div class="plan-name">Early Bird</div>
-        <div class="plan-price">¥3,000<span>/year</span></div>
-        <div class="plan-desc">This price is locked forever. Regular price ¥5,000/yr → <strong style="color:#F97316;">40% off</strong><br><span style="color:var(--accent); font-size:.8rem; font-weight:600;">{{ earlybird_remaining }} spots left</span></div>
-        <a href="/register" class="plan-cta primary">Try free for 7 days</a>
-        <div class="plan-trial">Credit card required · Cancel anytime</div>
-      </div>
-      {% endif %}
+
 
       <div class="plan-card">
         <div class="plan-name">Monthly</div>
