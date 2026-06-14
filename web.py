@@ -27,7 +27,7 @@ from database import (init_db, load_config, save_config,
                       apply_event_points, get_user_points, get_season_ranking, get_rank,
                       get_user_by_connect_code, get_user_by_email, get_user_by_username, set_user_email,
                       create_reset_token, verify_reset_token, consume_reset_token, update_password,
-                      add_app_to_config, record_first_save, record_first_sync, get_analytics,
+                      add_app_to_config, remove_app_from_config, record_first_save, record_first_sync, get_analytics,
                       set_stripe_subscription, get_user_by_stripe_customer_id,
                       get_streak_shield, use_streak_shield,
                       get_user_rank_position,
@@ -852,6 +852,22 @@ def api_apps_add(token):
     if not within_app_limit(full_user["plan"], len(config["apps"]) + 1):
         return jsonify({"error": "app_limit"}), 403
     add_app_to_config(user["id"], path)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/apps/remove/<token>", methods=["POST"])
+@csrf.exempt
+def api_apps_remove(token):
+    """エージェントのトレイUIからブロック中アプリを削除するエンドポイント。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    path = (request.json or {}).get("path", "").strip()
+    if not path.lower().endswith(".exe"):
+        return jsonify({"error": "invalid path"}), 400
+    remove_app_from_config(user["id"], path)
     return jsonify({"ok": True})
 
 

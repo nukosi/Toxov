@@ -943,6 +943,21 @@ def add_app_to_config(user_id: int, path: str) -> bool:
     return True
 
 
+def remove_app_from_config(user_id: int, path: str) -> bool:
+    """エージェントのトレイUIからアプリパスを削除する。見つからない場合はFalseを返す。"""
+    with Session(engine) as session:
+        row = session.query(App).filter_by(user_id=user_id, path=path).first()
+        if not row:
+            return False
+        session.delete(row)
+        # バージョンをインクリメントして次のpollでエージェントに即時反映させる
+        config = session.query(Config).filter_by(user_id=user_id).first()
+        if config:
+            config.version = (config.version or 0) + 1
+        session.commit()
+    return True
+
+
 def set_stripe_subscription(user_id: int, customer_id, subscription_id, plan: str,
                              trial_ends_at=None, plan_expires_at=None):
     """Webhookイベントを受けてStripeサブスク情報とプランをまとめて更新する。"""

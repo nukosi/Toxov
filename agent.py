@@ -59,12 +59,17 @@ STRINGS = {
         "status_unblocked": "解除中",
         "status_starting":  "起動中...",
         "menu_add_app":     "アプリを追加",
+        "menu_view_apps":   "ブロック中のアプリ",
         "menu_quit":        "終了",
         "ps_form_title":    "ブロックするアプリを選択",
         "ps_form_hint":     "ブロックしたいアプリを起動してからこの一覧で選んでください",
         "ps_btn_add":       "追加",
+        "ps_view_title":    "ブロック中のアプリ",
+        "ps_view_hint":     "選択して「削除」を押すとブロック解除します",
+        "ps_btn_remove":    "削除",
         "notify_added":     "追加: {name}",
         "notify_add_fail":  "追加に失敗しました（上限に達している可能性があります）",
+        "notify_removed":   "削除: {name}",
         "notify_reblock":   "再ブロック完了",
         "notify_block_start": "ブロック開始  {comment}",
         "notify_block_end":   "ブロック終了  {comment}",
@@ -84,12 +89,17 @@ STRINGS = {
         "status_unblocked": "Unblocked",
         "status_starting":  "Starting...",
         "menu_add_app":     "Add App",
+        "menu_view_apps":   "Blocked Apps",
         "menu_quit":        "Quit",
         "ps_form_title":    "Select App to Block",
         "ps_form_hint":     "Launch the app you want to block, then select it from this list",
         "ps_btn_add":       "Add",
+        "ps_view_title":    "Blocked Apps",
+        "ps_view_hint":     "Select an app and click Remove to unblock it",
+        "ps_btn_remove":    "Remove",
         "notify_added":     "Added: {name}",
         "notify_add_fail":  "Failed to add app (you may have reached the limit)",
+        "notify_removed":   "Removed: {name}",
         "notify_reblock":   "Re-block complete",
         "notify_block_start": "Blocking started  {comment}",
         "notify_block_end":   "Blocking ended  {comment}",
@@ -315,6 +325,8 @@ def set_doh_policy(disable: bool):
     # Edge・ChromeのDNS over HTTPSをレジストリのグループポリシーで制御する
     # disable=True でDoHを強制オフ（hostsファイルが有効になる）
     # disable=False でポリシーを削除しブラウザのデフォルト動作に戻す
+    # Edgeのスタートアップブースト（StartupBoostEnabled）も同時に制御する。
+    # スタートアップブーストはTask Schedulerより先にEdgeを起動してDoHポリシーを読み損ねる原因になる。
     targets = [
         r"SOFTWARE\Policies\Microsoft\Edge",
         r"SOFTWARE\Policies\Google\Chrome",
@@ -331,6 +343,20 @@ def set_doh_policy(disable: bool):
                         pass
         except Exception:
             pass
+    # EdgeのスタートアップブーストをブロックON/OFFと連動して制御する
+    # ブロック中はEdgeがTask Schedulerより先に起動しないよう無効化する
+    try:
+        edge_key = r"SOFTWARE\Policies\Microsoft\Edge"
+        with winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, edge_key) as key:
+            if disable:
+                winreg.SetValueEx(key, "StartupBoostEnabled", 0, winreg.REG_DWORD, 0)
+            else:
+                try:
+                    winreg.DeleteValue(key, "StartupBoostEnabled")
+                except FileNotFoundError:
+                    pass
+    except Exception:
+        pass
 
 
 def should_be_blocked(config):
@@ -624,6 +650,110 @@ if ($form.ShowDialog() -eq 'OK' -and $lv.SelectedItems.Count -gt 0) {
         except Exception as e:
             log(f"add app error: {e}")
 
+    def view_apps(icon, item):
+        # ブロック中のアプリ一覧を表示し、選択して削除できるWindows Formsダイアログ
+        import base64
+        remove_url = add_url.replace("/api/apps/add/", "/api/apps/remove/")
+        try:
+            # サーバーから最新の設定（アプリ一覧）を取得する
+            res = requests.get(
+                add_url.replace("/api/apps/add/", "/api/config/"),
+                headers=_API_HEADERS, timeout=10,
+            )
+            apps = res.json().get("apps", []) if res.ok else []
+        except Exception:
+            apps = []
+
+        # アプリ名（ファイル名）とフルパスのペアを改行区切りの文字列にしてPowerShellに渡す
+        # フォーマット: "表示名|フルパス" を行ごとに並べる
+        app_lines = "\n".join(
+            f"{os.path.basename(p)}|{p}" for p in apps
+        )
+        ps_script = r"""
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$rawLines = '__APP_LINES__' -split "`n"
+$entries  = @()
+foreach ($line in $rawLines) {
+    if ($line -match '\|') {
+        $parts = $line -split '\|', 2
+        $entries += [PSCustomObject]@{ Label = $parts[0]; Path = $parts[1] }
+    }
+}
+
+$form = New-Object System.Windows.Forms.Form
+$form.Text = '__VIEW_TITLE__'
+$form.Size = New-Object System.Drawing.Size(500, 360)
+$form.StartPosition = 'CenterScreen'
+$form.TopMost = $true
+$form.FormBorderStyle = 'FixedDialog'
+$form.MaximizeBox = $false
+
+$hint = New-Object System.Windows.Forms.Label
+$hint.Text = '__VIEW_HINT__'
+$hint.Location = New-Object System.Drawing.Point(12, 10)
+$hint.Size = New-Object System.Drawing.Size(460, 18)
+$hint.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+$form.Controls.Add($hint)
+
+$lv = New-Object System.Windows.Forms.ListView
+$lv.Location = New-Object System.Drawing.Point(12, 34)
+$lv.Size = New-Object System.Drawing.Size(460, 260)
+$lv.View = 'Details'
+$lv.FullRowSelect = $true
+$lv.MultiSelect = $false
+$lv.Font = New-Object System.Drawing.Font('Segoe UI', 10)
+$lv.HeaderStyle = 'None'
+$lv.Columns.Add('name', 440) | Out-Null
+
+foreach ($e in $entries) {
+    $li = New-Object System.Windows.Forms.ListViewItem($e.Label)
+    $li.Tag = $e.Path
+    $lv.Items.Add($li) | Out-Null
+}
+$form.Controls.Add($lv)
+
+$btn = New-Object System.Windows.Forms.Button
+$btn.Text = '__BTN_REMOVE__'
+$btn.Location = New-Object System.Drawing.Point(400, 302)
+$btn.Size = New-Object System.Drawing.Size(72, 28)
+$btn.DialogResult = 'OK'
+$btn.Enabled = $false
+$form.Controls.Add($btn)
+$form.AcceptButton = $btn
+
+$lv.add_SelectedIndexChanged({
+    $btn.Enabled = $lv.SelectedItems.Count -gt 0
+})
+
+if ($form.ShowDialog() -eq 'OK' -and $lv.SelectedItems.Count -gt 0) {
+    $lv.SelectedItems[0].Tag
+}
+"""
+        ps_script = (
+            ps_script
+            .replace("__APP_LINES__",   app_lines.replace("'", "''"))
+            .replace("__VIEW_TITLE__",  s["ps_view_title"])
+            .replace("__VIEW_HINT__",   s["ps_view_hint"])
+            .replace("__BTN_REMOVE__",  s["ps_btn_remove"])
+        )
+        encoded = base64.b64encode(ps_script.encode("utf-16-le")).decode("ascii")
+        result = subprocess.run(
+            ["powershell", "-WindowStyle", "Hidden", "-EncodedCommand", encoded],
+            capture_output=True, text=True, timeout=120,
+        )
+        path = result.stdout.strip()
+        if not path:
+            return
+        try:
+            res = requests.post(remove_url, json={"path": path},
+                                headers=_API_HEADERS, timeout=5)
+            if res.ok:
+                notify(s["notify_removed"].format(name=os.path.basename(path)))
+        except Exception as e:
+            log(f"remove app error: {e}")
+
     def quit_action(icon, item):
         # 終了時にhostsとファイアウォールを掃除してからアイコンを閉じる
         unblock(log)
@@ -633,6 +763,7 @@ if ($form.ShowDialog() -eq 'OK' -and $lv.SelectedItems.Count -gt 0) {
         pystray.MenuItem(status_text, None, enabled=False),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem(s["menu_add_app"], add_app),
+        pystray.MenuItem(s["menu_view_apps"], view_apps),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem(s["menu_quit"], quit_action),
     )
@@ -786,6 +917,14 @@ def main():
         _tray_state["blocking"] = init_state
         tray.icon = make_icon(init_state is True)
         log(f"cache applied: {'blocking' if init_state else 'unblocked'}")
+        if init_state:
+            # ブロック時間帯での起動時にブラウザを強制終了する。
+            # EdgeのスタートアップブーストはTask Schedulerより先に起動するため、
+            # Toxovがレジストリ（DoHポリシー）を書く前にEdgeが起動してしまう。
+            # 既存プロセスはポリシー変更を即時反映しないため（最大30分後）、
+            # 一度終了させて再起動時にポリシーを読み込ませる。
+            kill_browser_tabs(log)
+            kill_edge_connections(log)
     else:
         init_state, init_version = None, None
 
