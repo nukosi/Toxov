@@ -54,14 +54,16 @@ class UserModel(Base):
 
 class Config(Base):
     __tablename__ = "config"
-    id                = Column(Integer, primary_key=True, autoincrement=True)
-    user_id           = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-    block_start       = Column(String, nullable=False, default="08:00")
-    block_end         = Column(String, nullable=False, default="21:00")
-    emergency_unblock = Column(Boolean, nullable=False, default=False)
-    version           = Column(Integer, nullable=False, default=0)
+    id                   = Column(Integer, primary_key=True, autoincrement=True)
+    user_id              = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    block_start          = Column(String, nullable=False, default="08:00")
+    block_end            = Column(String, nullable=False, default="21:00")
+    emergency_unblock    = Column(Boolean, nullable=False, default=False)
+    # 緊急解除を開始した日時（JST・tzinfoなし）。24時間後に自動でブロック再開する。
+    emergency_started_at = Column(DateTime, nullable=True, default=None)
+    version              = Column(Integer, nullable=False, default=0)
     # ISO 8601 文字列（JST）。この時刻まで毎日スケジュールを無視して常時ブロックする
-    block_until       = Column(String, nullable=True, default=None)
+    block_until          = Column(String, nullable=True, default=None)
     user              = relationship("UserModel", back_populates="config")
 
 
@@ -218,6 +220,12 @@ def _migrate():
             if "block_until" not in config_columns:
                 conn.execute(text("ALTER TABLE config ADD COLUMN block_until TEXT DEFAULT NULL"))
                 conn.commit()
+        # config テーブルに emergency_started_at がなければ追加（24時間自動解除）
+        if "config" in inspector.get_table_names():
+            config_columns = [c["name"] for c in inspector.get_columns("config")]
+            if "emergency_started_at" not in config_columns:
+                conn.execute(text("ALTER TABLE config ADD COLUMN emergency_started_at TIMESTAMP DEFAULT NULL"))
+                conn.commit()
         # 既存ユーザーの user_points エントリが未作成なら初期化する
         users = conn.execute(text("SELECT id FROM users")).fetchall()
         for (uid,) in users:
@@ -349,21 +357,36 @@ def verify_password(username, password):
 
 
 def load_config(user_id):
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(JST).replace(tzinfo=None)
     with Session(engine) as session:
         config = session.query(Config).filter_by(user_id=user_id).first()
         sites  = session.query(Site).filter_by(user_id=user_id).all()
         if not config:
             return {"block_start": "08:00", "block_end": "21:00", "sites": []}
+        # 緊急解除が24時間を超えていたら自動でブロック再開する
+        if config.emergency_unblock and config.emergency_started_at:
+            elapsed = (now - config.emergency_started_at).total_seconds()
+            if elapsed >= 24 * 3600:
+                config.emergency_unblock = False
+                config.emergency_started_at = None
+                config.version = (config.version or 0) + 1
+                session.commit()
         apps = session.query(App).filter_by(user_id=user_id).all()
         return {
-            "version":          config.version or 0,
-            "block_start":      config.block_start,
-            "block_end":        config.block_end,
-            "sites":            [s.domain for s in sites],
-            "apps":             [a.path for a in apps],
-            "emergency_unblock": config.emergency_unblock or False,
+            "version":            config.version or 0,
+            "block_start":        config.block_start,
+            "block_end":          config.block_end,
+            "sites":              [s.domain for s in sites],
+            "apps":               [a.path for a in apps],
+            "emergency_unblock":  config.emergency_unblock or False,
             # ISO 8601 文字列（JST、tzinfoなし）。この時刻まで常時ブロックする
-            "block_until":      config.block_until or None,
+            "block_until":        config.block_until or None,
+            # 緊急解除の残り時間（秒）。UIでカウントダウン表示に使う。Noneなら非緊急解除中。
+            "emergency_remaining_secs": (
+                max(0, int(24 * 3600 - (now - config.emergency_started_at).total_seconds()))
+                if config.emergency_unblock and config.emergency_started_at else None
+            ),
         }
 
 
@@ -378,10 +401,13 @@ def set_block_until(user_id, until_iso: str | None):
 
 
 def set_emergency_unblock(user_id, value: bool):
+    JST = datetime.timezone(datetime.timedelta(hours=9))
     with Session(engine) as session:
         config = session.query(Config).filter_by(user_id=user_id).first()
         if config:
             config.emergency_unblock = value
+            # 開始時刻を記録（24時間後に自動解除するため）。終了時はクリア。
+            config.emergency_started_at = datetime.datetime.now(JST).replace(tzinfo=None) if value else None
             config.version = (config.version or 0) + 1
             session.commit()
 
