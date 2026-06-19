@@ -628,6 +628,19 @@ def api_emergency(token):
     return jsonify({"ok": True, "shield_used": False})
 
 
+@app.route("/api/resume/<token>", methods=["POST"])
+@csrf.exempt
+def api_resume(token):
+    """モバイルアプリから緊急解除を終了してブロックを再開するエンドポイント。"""
+    if not check_agent_secret():
+        return jsonify({"error": "forbidden"}), 403
+    user = get_user_by_token(token)
+    if not user:
+        return jsonify({"error": "invalid token"}), 401
+    set_emergency_unblock(user["id"], False)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/stats/<token>")
 @csrf.exempt
 def api_stats(token):
