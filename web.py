@@ -680,6 +680,16 @@ def api_admin_set_plan(token):
     return jsonify({"ok": True, "plan": plan})
 
 
+@app.route("/api/version")
+@csrf.exempt
+def api_version():
+    """モバイルアプリの最新バージョン情報を返す。
+    Railway環境変数 APK_VERSION_CODE / APK_DOWNLOAD_URL で管理する。"""
+    version_code = int(os.environ.get("APK_VERSION_CODE", "1"))
+    download_url = os.environ.get("APK_DOWNLOAD_URL", "")
+    return jsonify({"version_code": version_code, "download_url": download_url})
+
+
 @app.route("/api/mobile/login", methods=["POST"])
 @csrf.exempt
 @limiter.limit("10 per minute")
