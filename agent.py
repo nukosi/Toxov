@@ -40,6 +40,23 @@ HOSTS_FILE  = r"C:\Windows\System32\drivers\etc\hosts"
 BLOCK_TAG     = "# Toxov"
 # アプリ名変更前の旧タグ。hostsに残留している場合も除去する
 OLD_BLOCK_TAG = "# nukosisnsblocker"
+
+# サービスワーカーやCDNを使うサイトはapexドメインだけブロックしても迂回される。
+# 該当サイトがブロックリストにある場合、ここに列挙した関連ドメインも自動でブロックする。
+# YouTube: サービスワーカーが youtubei.googleapis.com API を叩くため、これをブロックしないと
+#          キャッシュからページが配信され再読み込みで突破される。
+COMPANION_DOMAINS = {
+    "youtube.com": [
+        "youtu.be",
+        "youtubei.googleapis.com",
+        "yt3.ggpht.com",
+        "ytimg.com",
+        "s.ytimg.com",
+        "i.ytimg.com",
+        "youtube-nocookie.com",
+        "googlevideo.com",
+    ],
+}
 JST         = datetime.timezone(datetime.timedelta(hours=9))
 POLL_INTERVAL = 30  # seconds
 
@@ -380,13 +397,21 @@ def block(sites, apps):
     set_doh_policy(disable=True)
 
     # --- Webサイト：hostsファイルで遮断 ---
+    # COMPANION_DOMAINSで定義した関連ドメインをサイトリストに展開する。
+    # YouTube等はサービスワーカーがAPIドメインを叩くため、apexだけでは迂回される。
+    all_sites = list(sites)
+    for site in sites:
+        for companion in COMPANION_DOMAINS.get(site, []):
+            if companion not in all_sites:
+                all_sites.append(companion)
+
     # 既存のエントリと重複しないよう先に全文を読んでから追記する
     with open(HOSTS_FILE, "r") as f:
         content = f.read()
     with open(HOSTS_FILE, "a") as f:
-        for site in sites:
+        for site in all_sites:
             # 保存時に normalize_domain でapexドメインに正規化済みのため、
-            # www. / m. / mobile. バリエーションをここで展開してすべてブロックする
+            # www. / m. バリエーションをここで展開してすべてブロックする
             variants = [site]
             if not site.startswith("www."):
                 variants.append(f"www.{site}")
